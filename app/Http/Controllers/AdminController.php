@@ -12,7 +12,7 @@ class AdminController extends Controller
     public function store(Request $request)
     {
         try {
-            $perusahaan = Perusahaan::where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+            $perusahaan =  DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
             $namaPerusahaan = $perusahaan->nama;
             if (!$perusahaan) {
                 // Handle case when Perusahaan is not found

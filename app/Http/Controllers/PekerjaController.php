@@ -5,20 +5,21 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Perusahaan;
 use App\Models\Pekerja;
+use Illuminate\Support\Facades\DB;
 
 class PekerjaController extends Controller
 {
     public function store(Request $request)
     {
         try {
-            $perusahaan = Perusahaan::where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+            $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
             $namaPerusahaan = $perusahaan->nama;
             if (!$perusahaan) {
                 // Handle case when Perusahaan is not found
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
-            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Pekerja/{$nama}", 'profile.png', 'public');
             $nama = $request->input('nama');
+            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Pekerja/{$nama}", 'profile.png', 'public');
             $pekerja = Pekerja::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
@@ -31,9 +32,9 @@ class PekerjaController extends Controller
             return response()->json(['status' => 'success', 
             'message' => 'pekerja created successfully', 
             'profile_path' => $profilePath,
-            'perusahaan_id' => $perusahaanId]);
+            'perusahaan_id' => $perusahaan->id]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Internal Server Error'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
     public function getPekerja($nama_perusahan){
