@@ -70,8 +70,6 @@ class LoginController extends Controller
                 ->where('id_pekerja', $Id_User)
                 ->exists();
             }
-
-            // Retry if the token already exists, up to a maximum number of attempts
         } while ($exists);
 
         return $token;
