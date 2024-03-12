@@ -44,3 +44,6 @@ Route::get('/getDataIzinPerusahaan/{nama_perusahaan}', [IzinController::class, '
 Route::get('/getDataIzinPekerja/{nama_perusahaan}/{nama_pekerja}', [IzinController::class, 'getDataPekerja']);
 Route::get('/getDataLemburPerusahaan/{nama_perusahaan}', [LemburController::class, 'getDataPerusahaan']);
 Route::get('/getDataLemburPekerja/{nama_perusahaan}/{nama_pekerja}', [LemburController::class, 'getDataPekerja']);
+Route::post('/AddLembur', [LemburController::class, 'store']);
+Route::post('/AddDinas', [DinasController::class, 'store']);
+Route::post('/AddIzin', [IzinController::class, 'store']);
