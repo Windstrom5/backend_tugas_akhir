@@ -17,7 +17,7 @@ class Dinas extends Model
         'tanggal_pulang', 
         'kegiatan', 
         'bukti', 
-        'update_at'
+        'status'
     ];
     public $timestamps = true; // This enables automatic timestamping
     const CREATED_AT = 'created_at'; // Customize the column name if needed

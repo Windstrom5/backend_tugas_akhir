@@ -9,20 +9,25 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Models\Pekerja;
+use App\Models\Perusahaan;
 
-class NewMessage
+class PekerjaUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public $message;
-
-    public function __construct($message)
+    public $perusahaanNama;
+    public $pekerja;
+    
+    public function __construct($perusahaanNama, $pekerja)
     {
-        $this->message = $message;
+        $this->perusahaanNama = $perusahaanNama;
+        $this->pekerja = $pekerja;
     }
 
     public function broadcastOn()
     {
-        return ['chat-channel'];
+        // Broadcast to a channel named after perusahaan.nama
+        return new Channel('pekerja-channel.' . $this->perusahaanNama);
     }
 }
+

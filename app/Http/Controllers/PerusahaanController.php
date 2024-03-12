@@ -8,7 +8,7 @@ use App\Models\Perusahaan;
 use App\Models\Admin;
 use App\Models\Pekerja;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PerusahaanController extends Controller
 {
@@ -23,7 +23,8 @@ class PerusahaanController extends Controller
     {
         try {
             $nama = $request->input('nama');
-            $logoPath = $request->file('logo')->storeAs("perusahaan/{$nama}/logo", 'logo.png', 'public');
+            $logoPath = $request->file('logo')->storeAs("perusahaan/{$nama}/logo",
+             time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
             $perusahaan = Perusahaan::create([
                 'nama' => $nama,
                 'latitude' => $request->input('latitude'),

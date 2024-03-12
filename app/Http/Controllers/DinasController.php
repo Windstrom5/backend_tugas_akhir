@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Dinas;
+use Illuminate\Support\Facades\DB;
+use App\Events\DinasUpdated;
 class DinasController extends Controller
 {
     public function index()
@@ -12,77 +14,69 @@ class DinasController extends Controller
         return view('dinas.index', compact('dinasList'));
     }
 
-    public function create(Request $request){
-        $absendata = DB::table('dinas')
-        ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
-        ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
-        ->select('dinas.*')
-        ->where('pekerja.nama', $request->input('nama'))
-        ->where('perusahaan.nama', $request->input('perusahaan'))
-        ->first();
-        $perusahaan = Perusahaan::where('nama', $request->input('perusahaan'))->first();
-        $jamMasuk = Carbon::parse($perusahaan->jam_masuk);
-        $jameluar = Carbon::parse($perusahaan->jam_keluar);
-        $currentDateTime = now();
+    public function store(Request $request){
+        $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
         if (!$perusahaan) {
-            return response()->json(['status' => 'error', 'message' => 'Perusahaan not found'], 404);
+            // Handle case when Perusahaan is not found
+            return response()->json(['error' => 'Perusahaan not found'], 404);
         }
-        // Check if current time is within 15 minutes of jam_masuk or jam_keluar
-        if ($currentDateTime->diffInMinutes($jamMasuk) <= 15 || $currentDateTime->diffInMinutes($jamKeluar) <= 15) {
-            if ($absendata) {
-                $absen = Absen::findOrFail($absendata->id);
-                $absen->update([
-                    'jam_keluar' => $request->input('jam_keluar'),
-                    'latitude' => $request->input('latitude'),
-                    'longitude' => $request->input('longitude'),
-                    'updated_at' => now()
-                ]);
+        $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
+        $buktiPath = $request->file('bukti')->storeAs("perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Dinas/Bukti",
+        time() . '_' . $request->file('bukti')->getClientOriginalName(), 'public');
+        $Dinas = Dinas::create([
+            'id_perusahaan' => $perusahaan->id,
+            'id_pekerja' => $pekerja->id,
+            'tujuan' => $request->input('tujuan'),
+            'tanggal_berangkat' => $request->input('tanggal_berangkat'),
+            'tanggal_pulang' => $request->input('tanggal_pulang'),
+            'kegiatan' => $request->input('kegiatan'),
+            'bukti' => $buktiPath
+        ]);
+        event(new DinasUpdated($perusahaan->nama, $Dinas));
+        return response()->json(['status' => 'success', 
+        'message' => 'pekerja created successfully']);
+    }
 
-                return response()->json(['status' => 'success', 'message' => 'Absen Ended']);
-            } else {
-                // Entry does not exist, create a new one
-                Absen::create([
-                    'id_pekerja' => $request->id_pekerja,
-                    'id_perusahaan' => $request->id_perusahaan,
-                    'tanggal' => $request->input('tanggal'),
-                    'jam_masuk' => $request->input('jam_masuk'),
-                    'latitude' => $request->input('latitude'),
-                    'longitude' => $request->input('longitude'),
-                    'updated_at' => now(),
-                ]);
-                return response()->json(['status' => 'success', 'message' => 'Absen Started']);
-            }
+    public function update(Request $request){
+        $Dinas = Dinas::select('Dinas.*', 'perusahaan.nama as nama_perusahaan')
+        ->join('perusahaan', 'Dinas.id_perusahaan', '=', 'perusahaan.id')
+        ->where('Dinas.id', $request->input('id'))
+        ->first();
+        if ($Dinas) {
+            // Update the status field
+            $Dinas->update([
+                'status' => $request->input('status')
+            ]);
+            event(new DinasUpdated($Dinas->nama_perusahaan, $Dinas));
+            return response()->json(['message' => 'Dinas record updated successfully']);
         } else {
-            // Return an error if the current time is not within 15 minutes of jam_masuk or jam_keluar
-            return response()->json(['status' => 'error', 'message' => 'Cannot start Absen. Current time is not within 15 minutes of jam_masuk or jam_keluar']);
+            // Handle the case where the record with the specified ID is not found
+            return response()->json(['error' => 'Dinas record not found'], 404);
         }
     }
 
-    public function store(Request $request)
+    public function getDataPerusahaan($nama_perusahaan)
     {
-        Dinas::create($request->all());
-        return redirect()->route('dinas.index')->with('success', 'Dinas created successfully');
+        $dinasData = DB::table('dinas')
+            ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
+            ->select('dinas.*')
+            ->where('perusahaan.nama', $nama_perusahaan)
+            ->get();
+    
+        return response()->json(['data' => $dinasData]);
     }
-
-    public function show(Dinas $dinas)
+    
+    public function getDataPekerja($nama_perusahaan,$nama_pekerja)
     {
-        return view('dinas.show', compact('dinas'));
+        $dinasData = DB::table('dinas')
+            ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
+            ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
+            ->select('dinas.*')
+            ->where('pekerja.nama', $nama_pekerja)
+            ->where('perusahaan.nama', $nama_perusahaan)
+            ->get();
+    
+        return response()->json(['data' => $dinasData]);
     }
-
-    public function edit(Dinas $dinas)
-    {
-        return view('dinas.edit', compact('dinas'));
-    }
-
-    public function update(Request $request, Dinas $dinas)
-    {
-        $dinas->update($request->all());
-        return redirect()->route('dinas.index')->with('success', 'Dinas updated successfully');
-    }
-
-    public function destroy(Dinas $dinas)
-    {
-        $dinas->delete();
-        return redirect()->route('dinas.index')->with('success', 'Dinas deleted successfully');
-    }
+    
 }

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Perusahaan;
 use App\Models\Admin;
 use Illuminate\Support\Facades\DB;
-
+use App\Events\AdminUpdated;
 class AdminController extends Controller
 {
     public function store(Request $request)
@@ -19,7 +19,8 @@ class AdminController extends Controller
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
             $nama = $request->input('nama');
-            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Admin/{$nama}", 'profile.png', 'public');
+            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Admin/{$nama}",
+            time() . '_' . $request->file('profile')->getClientOriginalName(), 'public');
             $admin = Admin::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
@@ -59,6 +60,41 @@ class AdminController extends Controller
             }
         } else {
             return response()->json(['message' => $request->input('nama_perusahaan')], 404);
+        }
+    }
+    public function updateData(Request $request)
+    {
+        try {
+            $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+            $namaPerusahaan = $perusahaan->nama;
+            if (!$perusahaan) {
+                // Handle case when Perusahaan is not found
+                return response()->json(['error' => 'Perusahaan not found'], 404);
+            }
+            $Admin = DB::table('admin')->findOrFail($request->input('id'));
+            $Admin->update([
+                'email' => $request->input('email'),
+                'nama' =>  $request->input('nama'),
+                'tanggal_lahir' => $request->input('tanggal_lahir'),
+            ]);
+            // Handle file upload for the profile field
+            if ($request->hasFile('profile')) {
+                $profilePath = $request->file('profile')->storeAs(
+                    "perusahaan/{$namaPerusahaan}/Admin/{$Admin->nama}",
+                    time() . '_' . $request->file('profile')->getClientOriginalName(),
+                    'public'
+                );
+                // Update the profile field in the database
+                $Admin->update(['profile' => $profilePath]);
+            }
+            broadcast(new AdminUpdated($namaPerusahaan,$Admin));
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Admin updated successfully',
+                'Admin' => $Admin,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }

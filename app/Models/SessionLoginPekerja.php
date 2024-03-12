@@ -13,10 +13,8 @@ class SessionLoginPekerja extends Model
         'id',
         'id_pekerja',
         'token',
-        'created_at'	
     ];
-    public $timestamps = false;
-    protected $casts = [
-        'created_at' => 'datetime',
-    ];
+    public $timestamps = true; // This enables automatic timestamping
+    const CREATED_AT = 'created_at'; // Customize the column name if needed
+    const UPDATED_AT = 'updated_at'; // Customize the column name if needed
 }

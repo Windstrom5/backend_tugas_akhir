@@ -10,19 +10,21 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class NewMessage
+class IzinUpdated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public $message;
-
-    public function __construct($message)
+    public $perusahaanNama;
+    public $izin;
+    
+    public function __construct($perusahaanNama, $izin)
     {
-        $this->message = $message;
+        $this->perusahaanNama = $perusahaanNama;
+        $this->izin = $izin;
     }
 
     public function broadcastOn()
     {
-        return ['chat-channel'];
+        // Broadcast to a channel named after perusahaan.nama
+        return new Channel('izin-channel.' . $this->perusahaanNama);
     }
 }

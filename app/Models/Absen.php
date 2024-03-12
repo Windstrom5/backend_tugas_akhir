@@ -17,7 +17,6 @@ class Absen extends Model
         'jam_keluar', 
         'latitude', 
         'longitude',
-        'update_at'
     ];
     public $timestamps = true; // This enables automatic timestamping
     const CREATED_AT = 'created_at'; // Customize the column name if needed

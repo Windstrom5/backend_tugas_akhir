@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Perusahaan;
 use App\Models\Pekerja;
 use Illuminate\Support\Facades\DB;
+use App\Events\PekerjaUpdated;
+use Illuminate\Support\Facades\Storage;
 
 class PekerjaController extends Controller
 {
@@ -19,7 +21,8 @@ class PekerjaController extends Controller
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
             $nama = $request->input('nama');
-            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Pekerja/{$nama}", 'profile.png', 'public');
+            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Pekerja/{$nama}", 
+            time() . '_' . $request->file('profile')->getClientOriginalName(), 'public');
             $pekerja = Pekerja::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
@@ -29,6 +32,7 @@ class PekerjaController extends Controller
                 'profile' => $profilePath
             ]);
             $pekerjaId = $pekerja->getKey();
+            broadcast(new PekerjaUpdated($perusahaan->nama, $pekerja));
             return response()->json(['status' => 'success', 
             'message' => 'pekerja created successfully', 
             'profile_path' => $profilePath,
@@ -37,22 +41,74 @@ class PekerjaController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function resetPassword(Request $request){
+        try {
+            $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+            $namaPerusahaan = $perusahaan->nama;
+            if (!$perusahaan) {
+                // Handle case when Perusahaan is not found
+                return response()->json(['error' => 'Perusahaan not found'], 404);
+            }
+            $pekerja = Pekerja::where("email", $request->input('email'))
+            ->where("id_perusahaan", $perusahaan->id)
+            ->first();
+            $pekerja->update([
+                'password' => md5($request->input('password'))
+            ]);
+            event(new PekerjaUpdated($namaPerusahaan, $pekerja));
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pekerja updated successfully',
+                'pekerja' => $pekerja,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function updateData(Request $request){
+        $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+        if (!$perusahaan) {
+            // Handle case when Perusahaan is not found
+             return response()->json(['error' => $request->all()], 404);
+         }
+        $pekerja = Pekerja::where("nama", $request->input('old_nama'))
+        ->where("id_perusahaan", $perusahaan->id)
+        ->first(); 
+        $pekerja->update([
+            'email' => $request->input('email'),
+            'nama' =>  $request->input('nama'),
+            'tanggal_lahir' => $request->input('tanggal_lahir'),
+        ]);
+        // Handle file upload for the profile field
+        if ($request->hasFile('profile')) {
+            $profilePath = $request->file('profile')->storeAs(
+                "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}",
+                time() . '_' . $request->file('profile')->getClientOriginalName(),
+                'public'
+            );
+            // Update the profile field in the database
+            $pekerja->update(['profile' => $profilePath]);
+        }
+        broadcast(new PekerjaUpdated($perusahaan->nama, $pekerja));
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pekerja updated successfully',
+            'pekerja' => $pekerja,
+        ]);
+    }
+
     public function getPekerja($nama_perusahan){
         $pekerjadata = DB::table('pekerja')
         ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
         ->select('pekerja.*')
-        ->where('perusahaan.nama', $request->input('perusahaan'))
+        ->where('perusahaan.nama', $nama_perusahan)
         ->get();
         if ($pekerjadata) {
             return response()->json($pekerjadata);
         }else{
             return response()->json(['status' => 'error', 'message' => 'offline'], 404);
         }
-    }
-    
-    private function getLogoUrl($profilePath)
-    {
-        // Assuming 'public' disk is used for storage
-        return Storage::disk('public')->url($profilePath);
     }
 }

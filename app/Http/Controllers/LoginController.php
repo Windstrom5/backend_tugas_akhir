@@ -22,7 +22,6 @@ class LoginController extends Controller
         ->where('admin.password', md5($password))
         ->where('perusahaan.nama', $perusahaan)
         ->first();
-
         if (!$admin) {
             $pekerja = DB::table('pekerja')
             ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
@@ -32,13 +31,12 @@ class LoginController extends Controller
             ->where('perusahaan.nama', $perusahaan)
             ->first();
             if (!$pekerja){
-                return response()->json(['error' => 'email Atau Password Salah'], 500);
+                return response()->json(['error' => $perusahaan], 500);
             }else{
                 $token = $this->generateUniqueToken($pekerja->id,'Pekerja');
                 $loginSession = new SessionLoginPekerja;
                 $loginSession ->id_pekerja = $pekerja->id;
                 $loginSession ->token = $token;
-                $loginSession ->created_at = now();
                 $loginSession ->save();
                 return response()->json(['token' => $token, 'user' => $pekerja,'Role' => 'Pekerja']);
             }
@@ -47,7 +45,6 @@ class LoginController extends Controller
             $loginSession = new SessionLoginAdmin;
             $loginSession ->id_admin = $admin->id;
             $loginSession ->token = $token;
-            $loginSession ->created_at = now();
             $loginSession ->save();
             return response()->json(['token' => $token,'user' => $admin,'Role' => 'Admin']);
         }
