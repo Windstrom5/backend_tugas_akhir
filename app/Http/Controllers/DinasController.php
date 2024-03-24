@@ -58,10 +58,11 @@ class DinasController extends Controller
     public function getDataPerusahaan($nama_perusahaan)
     {
         $dinasData = DB::table('dinas')
-            ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
-            ->select('dinas.*')
-            ->where('perusahaan.nama', $nama_perusahaan)
-            ->get();
+        ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
+        ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
+        ->select('dinas.*', 'perusahaan.nama as nama_perusahaan', 'pekerja.nama as nama_pekerja')
+        ->where('perusahaan.nama', $nama_perusahaan)
+        ->get();
     
         return response()->json(['data' => $dinasData]);
     }
@@ -69,9 +70,9 @@ class DinasController extends Controller
     public function getDataPekerja($nama_perusahaan,$nama_pekerja)
     {
         $dinasData = DB::table('dinas')
-            ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
             ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
-            ->select('dinas.*')
+            ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
+            ->select('dinas.*,perusahaan.nama as nama_perusahaan,pekerja.nama as nama_pekerja')
             ->where('pekerja.nama', $nama_pekerja)
             ->where('perusahaan.nama', $nama_perusahaan)
             ->get();
@@ -79,4 +80,13 @@ class DinasController extends Controller
         return response()->json(['data' => $dinasData]);
     }
     
+    // public function getDataPekerjaDinas($id_perusahaan,$id_pekerja){
+    //     $pekerja = DB::table('pekerja')
+    //         ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
+    //         ->select('pekerja')
+    //         ->where('pekerja.id', $id_pekerja)
+    //         ->where('perusahaan.nama', $id_perusahaan)
+    //         ->first();
+    //     return response()->json(['data' => $pekerja]);    
+    // }
 }

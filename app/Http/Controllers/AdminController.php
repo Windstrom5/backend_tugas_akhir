@@ -97,4 +97,33 @@ class AdminController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function promote(Request $request){
+        $pekerjadata = DB::table('pekerja')
+        ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
+        ->select('pekerja.*')
+        ->where('perusahaan.nama',  $request->input('nama_perusahaan'))
+        ->where('pekerja.nama',  $request->input('nama'))
+        ->first();
+        if ($pekerjadata) {
+            // Create a new record in the admin table
+            DB::table('admin')->insert([
+                'id_perusahaan' => $pekerjadata->id_perusahaan,
+                'email' => $pekerjadata->email,
+                'password' => $pekerjadata->password,
+                'nama' => $pekerjadata->nama,
+                'tanggal_lahir' => $pekerjadata->tanggal_lahir,
+                'profile' => $pekerjadata->profile
+            ]);
+    
+            // Delete the record from the pekerja table
+            DB::table('pekerja')->where('id', $pekerjadata->id)->delete();
+    
+            // Return success response
+            return response()->json(['message' => 'Data promoted successfully']);
+        } else {
+            // Return error response if data not found
+            return response()->json(['error' => 'Data not found'], 404);
+        }
+    }
 }

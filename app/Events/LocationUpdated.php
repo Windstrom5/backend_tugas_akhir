@@ -10,32 +10,33 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+
 class LocationUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $absendata;
-
-    public function __construct($absendata)
+    public $perusahaanNama;
+    
+    public function __construct($absendata, $perusahaanNama)
     {
         $this->absendata = $absendata;
+        $this->perusahaanNama = $perusahaanNama;
     }
     
     public function broadcastOn()
     {
-        // Return a string channel name using the 'nama' of the Pekerja
-        return 'location-updates.' . $this->absendata->nama;
+        $perusahaanData = DB::table('perusahaan')
+            ->where('id', $this->absendata->id_perusahaan)
+            ->first();
+        return 'location-updates.' . $perusahaanData->nama_perusahaan;
     }
     
     public function broadcastWith()
     {
-        // Assuming you have a 'pekerjas' table with a 'nama' column
-        $pekerjaData = DB::table('pekerja')
-            ->where('id', $this->absendata->id_pekerja)
-            ->first();
-    
+        $pekerja = DB::table('pekerja')->where('id', $this->absendata->id_pekerja)->first();
         return [
-            'nama' => $pekerjaData->nama,
+            'nama' => $pekerja->nama,
             'latitude' => $this->absendata->latitude,
             'longitude' => $this->absendata->longitude,
             'updated_at' => $this->absendata->updated_at,

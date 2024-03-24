@@ -31,7 +31,7 @@ Route::post('/DaftarAdmin', [AdminController::class, 'store']);
 Route::post('/messages', [MessageController::class, 'store']);
 Route::get('/getPerusahaan/{nama_perusahaan}', [PerusahaanController::class, 'show']);
 Route::get('/getLocation/{nama_perusahaan}', [AbsenController::class, 'getPekerjaLocation']);
-Route::post('/UpdateLocation', [AbsenController::class, 'updateLocation']);
+Route::put('/UpdateLocation', [AbsenController::class, 'updateLocation']);
 Route::post('/Absensi', [AbsenController::class, 'absen']);
 Route::get('/getPekerja/{nama_perusahaan}', [PekerjaController::class, 'getPekerja']);
 Route::put('/editPasswordAdmin', [AdminController::class, 'editPassword']);
@@ -47,3 +47,6 @@ Route::get('/getDataLemburPekerja/{nama_perusahaan}/{nama_pekerja}', [LemburCont
 Route::post('/AddLembur', [LemburController::class, 'store']);
 Route::post('/AddDinas', [DinasController::class, 'store']);
 Route::post('/AddIzin', [IzinController::class, 'store']);
+Route::put('/UpdateIzin', [IzinController::class, 'update']);
+Route::put('/UpdateIzin', [DinasController::class, 'update']);
+Route::put('/UpdateIzin', [LemburController::class, 'update']);

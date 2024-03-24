@@ -32,7 +32,7 @@ class PekerjaController extends Controller
                 'profile' => $profilePath
             ]);
             $pekerjaId = $pekerja->getKey();
-            broadcast(new PekerjaUpdated($perusahaan->nama, $pekerja));
+            broadcast(new PekerjaUpdated($pekerja,$perusahaan->nama,'Pekerja'));
             return response()->json(['status' => 'success', 
             'message' => 'pekerja created successfully', 
             'profile_path' => $profilePath,
@@ -56,7 +56,7 @@ class PekerjaController extends Controller
             $pekerja->update([
                 'password' => md5($request->input('password'))
             ]);
-            event(new PekerjaUpdated($namaPerusahaan, $pekerja));
+            broadcast(new PekerjaUpdated($pekerja,$perusahaan->nama,'Pekerja'));
             return response()->json([
                 'status' => 'success',
                 'message' => 'Pekerja updated successfully',
@@ -76,6 +76,9 @@ class PekerjaController extends Controller
         $pekerja = Pekerja::where("nama", $request->input('old_nama'))
         ->where("id_perusahaan", $perusahaan->id)
         ->first(); 
+        if (!$pekerja) {
+             return response()->json(['error' => $request->input('nama')], 404);
+         }
         $pekerja->update([
             'email' => $request->input('email'),
             'nama' =>  $request->input('nama'),
@@ -91,7 +94,7 @@ class PekerjaController extends Controller
             // Update the profile field in the database
             $pekerja->update(['profile' => $profilePath]);
         }
-        broadcast(new PekerjaUpdated($perusahaan->nama, $pekerja));
+        broadcast(new PekerjaUpdated($pekerja,$perusahaan->nama,'Pekerja'));
         return response()->json([
             'status' => 'success',
             'message' => 'Pekerja updated successfully',
@@ -99,11 +102,11 @@ class PekerjaController extends Controller
         ]);
     }
 
-    public function getPekerja($nama_perusahan){
+    public function getPekerja($nama_perusahaan){
         $pekerjadata = DB::table('pekerja')
         ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
         ->select('pekerja.*')
-        ->where('perusahaan.nama', $nama_perusahan)
+        ->where('perusahaan.nama', $nama_perusahaan)
         ->get();
         if ($pekerjadata) {
             return response()->json($pekerjadata);

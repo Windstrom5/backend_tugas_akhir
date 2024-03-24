@@ -11,23 +11,38 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use App\Models\Pekerja;
 use App\Models\Perusahaan;
+use Illuminate\Support\Facades\DB;
 
 class PekerjaUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
-    public $perusahaanNama;
-    public $pekerja;
-    
-    public function __construct($perusahaanNama, $pekerja)
+    public $pekerjadata;
+    public $perusahaan_nama;
+    public $role;
+
+    public function __construct($pekerjadata,$perusahaan_nama,$role)
     {
-        $this->perusahaanNama = $perusahaanNama;
-        $this->pekerja = $pekerja;
+        $this->pekerjadata = $pekerjadata;
+        $this->perusahaan_nama = $perusahaan_nama;
+        $this->role = $role;
     }
 
     public function broadcastOn()
     {
-        // Broadcast to a channel named after perusahaan.nama
-        return new Channel('pekerja-channel.' . $this->perusahaanNama);
+        $perusahaanData = DB::table('perusahaan')
+            ->select('perusahaan.*')
+            ->where('id', $this->pekerjadata->id_perusahaan)
+            ->first();
+    
+        return 'pekerja-updates.' . $perusahaanData->nama;
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'pekerjadata' => $this->pekerjadata->toArray(),
+            'role' => $this->role
+        ];
     }
 }
 

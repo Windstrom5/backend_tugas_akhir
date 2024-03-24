@@ -14,7 +14,7 @@ class AbsenController extends Controller
         $absendata = DB::table('absen')
         ->join('pekerja', 'absen.id_pekerja', '=', 'pekerja.id')
         ->join('perusahaan', 'absen.id_perusahaan', '=', 'perusahaan.id')
-        ->select('absen.*')
+        ->select('absen.*,pekerja.nama as nama,perusahaan.nama as nama_perusahaan')
         ->where('pekerja.nama', $request->input('nama'))
         ->where('perusahaan.nama', $request->input('perusahaan'))
         ->first();
@@ -28,6 +28,7 @@ class AbsenController extends Controller
         if (!$perusahaan) {
             return response()->json(['status' => 'error', 'message' => 'Perusahaan not found'], 404);
         }
+        $perusahaan_nama = $perusahaan->nama; 
         // Check if current time is within 15 minutes of jam_masuk or jam_keluar
             if ($absendata) {
                 if($requestedJam->diffInMinutes($jamKeluar) <= 15){
@@ -37,7 +38,7 @@ class AbsenController extends Controller
                         'latitude' => $request->input('latitude'),
                         'longitude' => $request->input('longitude'),
                     ]);
-    
+                    event(new LocationUpdated($absen,$perusahaan_nama));
                     return response()->json(['status' => 'success', 'message' => 'Absen Ended']);
                 } else {
                     // Return an error if the current time is not within 15 minutes of jam_masuk or jam_keluar
@@ -46,7 +47,7 @@ class AbsenController extends Controller
             } else {
                 if ($requestedJam->diffInMinutes($jamMasuk) <= 15){
                     // Entry does not exist, create a new one
-                    Absen::create([
+                    $newAbsen = Absen::create([
                         'id_pekerja' => $pekerja->id,
                         'id_perusahaan' => $perusahaan->id,
                         'tanggal' => $request->input('tanggal'),
@@ -54,6 +55,7 @@ class AbsenController extends Controller
                         'latitude' => $request->input('latitude'),
                         'longitude' => $request->input('longitude'),
                     ]);
+                    event(new LocationUpdated($newAbsen,$perusahaan_nama));
                     return response()->json(['status' => 'success', 'message' => 'Absen Started']);
                 } else {
                     // Return an error if the current time is not within 15 minutes of jam_masuk or jam_keluar
@@ -69,14 +71,17 @@ class AbsenController extends Controller
         ->join('perusahaan', 'absen.id_perusahaan', '=', 'perusahaan.id')
         ->where('pekerja.nama', $request->input('nama'))
         ->where('perusahaan.nama', $request->input('perusahaan'))
+        ->where('tanggal', today())
         ->update([
             'latitude' => $request->input('latitude'),
             'longitude' => $request->input('longitude'),
         ]);
-
+        $perusahaanData = DB::table('perusahaan')
+            ->where('id', $this-> $affectedRows->id_perusahaan)
+            ->first();
         if ($affectedRows > 0) {
             // Broadcast the location update event
-            broadcast(new LocationUpdated($affectedRows));
+            broadcast(new LocationUpdated($affectedRows, $perusahaanData->nama));
             
             return response()->json([
                 'status' => 'success',

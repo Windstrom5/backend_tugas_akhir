@@ -12,10 +12,11 @@ class IzinController extends Controller
     public function getDataPerusahaan($nama_perusahaan)
     {
         $izinData = DB::table('izin')
-            ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
-            ->select('izin.*')
-            ->where('perusahaan.nama', $nama_perusahaan)
-            ->get();
+        ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
+        ->join('pekerja', 'izin.id_pekerja', '=', 'pekerja.id')
+        ->select('izin.*', 'perusahaan.nama as nama_perusahaan', 'pekerja.nama as nama_pekerja')
+        ->where('perusahaan.nama', $nama_perusahaan)
+        ->get();
     
         return response()->json(['data' => $izinData]);
     }
@@ -25,13 +26,14 @@ class IzinController extends Controller
         $izinData = DB::table('izin')
             ->join('pekerja', 'izin.id_pekerja', '=', 'pekerja.id')
             ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
-            ->select('izin.*')
+            ->select('izin.*,perusahaan.nama as nama_perusahaan,pekerja.nama as nama_pekerja')
             ->where('pekerja.nama', $nama_pekerja)
             ->where('perusahaan.nama', $nama_perusahaan)
             ->get();
     
         return response()->json(['data' => $izinData]);
     }
+    
     public function store(Request $request){
         $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
         if (!$perusahaan) {
