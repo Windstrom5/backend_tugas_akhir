@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Izin;
 use Illuminate\Support\Facades\DB;
 use App\Events\IzinUpdated;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 class IzinController extends Controller
 {
     //
@@ -24,12 +26,12 @@ class IzinController extends Controller
     public function getDataPekerja($nama_perusahaan,$nama_pekerja)
     {
         $izinData = DB::table('izin')
-            ->join('pekerja', 'izin.id_pekerja', '=', 'pekerja.id')
-            ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
-            ->select('izin.*,perusahaan.nama as nama_perusahaan,pekerja.nama as nama_pekerja')
-            ->where('pekerja.nama', $nama_pekerja)
-            ->where('perusahaan.nama', $nama_perusahaan)
-            ->get();
+        ->join('pekerja', 'izin.id_pekerja', '=', 'pekerja.id')
+        ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
+        ->select('izin.*', 'perusahaan.nama as nama_perusahaan', 'pekerja.nama as nama_pekerja')
+        ->where('pekerja.nama', $nama_pekerja)
+        ->where('perusahaan.nama', $nama_perusahaan)
+        ->get();
     
         return response()->json(['data' => $izinData]);
     }
@@ -55,8 +57,49 @@ class IzinController extends Controller
         return response()->json(['status' => 'success', 
         'message' => 'pekerja created successfully']);
     }
-
-    public function update(Request $request){
+    
+    public function update(Request $request, $id){
+        // Find the existing Izin record by ID
+        $izin = DB::table('izin')
+            ->join('perusahaan', 'izin.id_perusahaan', '=', 'perusahaan.id')
+            ->join('pekerja', 'izin.id_pekerja', '=', 'pekerja.id')
+            ->select('izin.*', 'perusahaan.nama as perusahaan_nama', 'pekerja.nama as pekerja_nama')
+            ->where('izin.id', $id)
+            ->first();
+        // Check if the Izin record exists
+        if (!$izin) {
+            // Handle case when Izin is not found
+            return response()->json(['error' => 'Izin not found'], 404);
+        }
+        $perusahaanNama = $izin->perusahaan_nama;
+        $pekerjaNama = $izin->pekerja_nama;
+        $izin->tanggal = $request->input('tanggal');
+        $izin->kategori = $request->input('kategori');
+        $izin->alasan = $request->input('alasan');
+        if ($request->hasFile('bukti')) {
+            $buktiPath = public_path("storage/{$izin->bukti}");
+            File::delete($buktiPath);    
+            $buktiPath = $request->file('bukti')->storeAs(
+                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Izin/Bukti",
+                time() . '_' . $request->file('bukti')->getClientOriginalName(),
+                'public'
+            );
+            $izin->bukti = $buktiPath;
+            DB::table('izin')
+            ->where('id', $id)
+            ->update(['bukti' => $buktiPath]);
+        }
+        DB::table('izin')
+        ->where('id', $id)
+        ->update([
+            'tanggal' => $request->input('tanggal'),
+            'kategori' => $request->input('kategori'),
+            'alasan' => $request->input('alasan'),
+        ]);
+        return response()->json(['status' => 'success', 'message' => 'Izin updated successfully']);
+    }
+    
+    public function updatestatus(Request $request){
         $Izin = Izin::select('Izin.*', 'perusahaan.nama as nama_perusahaan')
         ->join('perusahaan', 'Izin.id_perusahaan', '=', 'perusahaan.id')
         ->where('Izin.id', $request->input('id'))
@@ -66,7 +109,7 @@ class IzinController extends Controller
             $Izin->update([
                 'status' => $request->input('status')
             ]);
-            event(new IzinUpdated($Izin->nama_perusahaan, $Izin));
+                // event(new IzinUpdated($Izin->nama_perusahaan, $Izin));
             return response()->json(['message' => 'Izin record updated successfully']);
         } else {
             // Handle the case where the record with the specified ID is not found

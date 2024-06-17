@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Dinas;
 use Illuminate\Support\Facades\DB;
 use App\Events\DinasUpdated;
+use Illuminate\Support\Facades\File;
 class DinasController extends Controller
 {
     public function index()
@@ -36,22 +37,60 @@ class DinasController extends Controller
         return response()->json(['status' => 'success', 
         'message' => 'pekerja created successfully']);
     }
-
-    public function update(Request $request){
-        $Dinas = Dinas::select('Dinas.*', 'perusahaan.nama as nama_perusahaan')
-        ->join('perusahaan', 'Dinas.id_perusahaan', '=', 'perusahaan.id')
-        ->where('Dinas.id', $request->input('id'))
+    public function update(Request $request, $id){
+        // Find the existing dinas record by ID
+        $dinas = DB::table('dinas')
+            ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
+            ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
+            ->select('dinas.*', 'perusahaan.nama as perusahaan_nama', 'pekerja.nama as pekerja_nama')
+            ->where('dinas.id', $id)
+            ->first();
+        // Check if the dinas record exists
+        if (!$dinas) {
+            // Handle case when dinas is not found
+            return response()->json(['error' => 'dinas not found'], 404);
+        }
+        $perusahaanNama = $dinas->perusahaan_nama;
+        $pekerjaNama = $dinas->pekerja_nama;
+        if ($request->hasFile('bukti')) {
+            $buktiPath = public_path("storage/{$dinas->bukti}");
+            File::delete($buktiPath);    
+            $buktiPath = $request->file('bukti')->storeAs(
+                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/dinas/Bukti",
+                time() . '_' . $request->file('bukti')->getClientOriginalName(),
+                'public'
+            );
+            $dinas->bukti = $buktiPath;
+            DB::table('dinas')
+            ->where('id', $id)
+            ->update(['bukti' => $buktiPath]);
+        }
+        DB::table('dinas')
+        ->where('id', $id)
+        ->update([
+            'tanggal_berangkat' => $request->input('berangkat'),
+            'tanggal_pulang' => $request->input('pulang'),
+            'tujuan' => $request->input('tujuan'),
+            'kegiatan' => $request->input('kegiatan'),
+        ]);
+        return response()->json(['status' => 'success', 'message' => 'dinas updated successfully']);
+    }
+    
+    public function updatestatus(Request $request){
+        $Dinas = Dinas::select('dinas.*', 'perusahaan.nama as nama_perusahaan')
+        ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
+        ->where('dinas.id', $request->input('id'))
         ->first();
         if ($Dinas) {
             // Update the status field
             $Dinas->update([
                 'status' => $request->input('status')
             ]);
-            event(new DinasUpdated($Dinas->nama_perusahaan, $Dinas));
+            // event(new DinasUpdated($Dinas->nama_perusahaan, $Dinas));
             return response()->json(['message' => 'Dinas record updated successfully']);
         } else {
             // Handle the case where the record with the specified ID is not found
-            return response()->json(['error' => 'Dinas record not found'], 404);
+            return response()->json(['error' => $request->input('id')], 404);
         }
     }
 
@@ -67,18 +106,19 @@ class DinasController extends Controller
         return response()->json(['data' => $dinasData]);
     }
     
-    public function getDataPekerja($nama_perusahaan,$nama_pekerja)
+    public function getDataPekerja($nama_perusahaan, $nama_pekerja)
     {
         $dinasData = DB::table('dinas')
             ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
             ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
-            ->select('dinas.*,perusahaan.nama as nama_perusahaan,pekerja.nama as nama_pekerja')
+            ->select('dinas.*', 'perusahaan.nama as nama_perusahaan', 'pekerja.nama as nama_pekerja')
             ->where('pekerja.nama', $nama_pekerja)
             ->where('perusahaan.nama', $nama_perusahaan)
             ->get();
     
         return response()->json(['data' => $dinasData]);
     }
+    
     
     // public function getDataPekerjaDinas($id_perusahaan,$id_pekerja){
     //     $pekerja = DB::table('pekerja')

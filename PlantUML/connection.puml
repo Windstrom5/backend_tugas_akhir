@@ -1,0 +1,21 @@
+@startuml
+!include Perusahaan.puml
+!include Admin.puml
+!include Pekerja.puml
+!include Lembur.puml
+!include Dinas.puml
+!include Izin.puml
+!include Absen.puml
+Dinas "1" -- "1" Perusahaan: Belongs to
+Dinas "1" -- "1" Pekerja: Belongs to
+Izin "1" -- "1" Perusahaan: Belongs to
+Izin "1" -- "1" Pekerja: Belongs to
+Admin "1" --> "*" Perusahaan: Manages
+Absen "1" -- "1" Perusahaan: Belongs to
+Lembur "1" -- "1" Perusahaan: Belongs to
+Lembur "1" -- "1" Pekerja: Belongs to
+Pekerja "1" --> "*" Perusahaan: Belongs
+Pekerja "1" --> "*" Admin: Can be
+Perusahaan "1" --> "*" Admin: Has
+Perusahaan "1" --> "*" Pekerja: Has
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+!include Connection.puml
+
+class Dinas {
+    -id: integer
+    -id_pekerja: integer
+    -id_perusahaan: integer
+    -tujuan: string
+    -tanggal_berangkat: date
+    -tanggal_pulang: date
+    -kegiatan: string
+    -bukti: string
+    -status: string
+    +index(): View
+    +store(Request $request): JsonResponse
+    +update(Request $request, $id: integer): JsonResponse
+    +updatestatus(Request $request): JsonResponse
+    +getDataPerusahaan($nama_perusahaan: string): JsonResponse
+    +getDataPekerja($nama_perusahaan: string, $nama_pekerja: string): JsonResponse
+}
+
+
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+!include Connection.puml
+class Admin {
+    -id: integer
+    -id_perusahaan: integer
+    -email: string
+    -password: string
+    -nama: string
+    -tanggal_lahir: date
+    -profile: string
+    +create(Request $request): JsonResponse
+    +editPassword(Request $request): JsonResponse
+    +updateData(Request $request): JsonResponse
+    +promote(Request $request): JsonResponse
+    +login(Request $request): JsonResponse
+}
+
+
+
+@enduml

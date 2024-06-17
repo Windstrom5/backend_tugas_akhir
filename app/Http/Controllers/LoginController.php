@@ -14,39 +14,42 @@ class LoginController extends Controller
     {
         $email = $request->input('email');
         $password = $request->input('password');
-        $perusahaan = $request->input('perusahaan');
         $admin = DB::table('admin')
-        ->join('perusahaan', 'admin.id_perusahaan', '=', 'perusahaan.id')
-        ->select('admin.*', 'perusahaan.nama as nama_perusahaan',)
+        ->select('admin.*')
         ->where('admin.email', $email)
         ->where('admin.password', md5($password))
-        ->where('perusahaan.nama', $perusahaan)
         ->first();
         if (!$admin) {
             $pekerja = DB::table('pekerja')
-            ->join('perusahaan', 'pekerja.id_perusahaan', '=', 'perusahaan.id')
-            ->select('pekerja.*', 'perusahaan.nama as nama_perusahaan')
+            ->select('pekerja.*')
             ->where('pekerja.email', $email)
             ->where('pekerja.password', md5($password))
-            ->where('perusahaan.nama', $perusahaan)
             ->first();
             if (!$pekerja){
-                return response()->json(['error' => $perusahaan], 500);
+                return response()->json(['error' => 'not found'], 500);
             }else{
-                $token = $this->generateUniqueToken($pekerja->id,'Pekerja');
-                $loginSession = new SessionLoginPekerja;
-                $loginSession ->id_pekerja = $pekerja->id;
-                $loginSession ->token = $token;
-                $loginSession ->save();
-                return response()->json(['token' => $token, 'user' => $pekerja,'Role' => 'Pekerja']);
+                // $token = $this->generateUniqueToken($pekerja->id,'Pekerja');
+                // $loginSession = new SessionLoginPekerja;
+                // $loginSession ->id_pekerja = $pekerja->id;
+                // $loginSession ->token = $token;
+                // $loginSession ->save();
+                $perusahaan = DB::table('perusahaan')
+                ->select('perusahaan.*')
+                ->where('perusahaan.id', $pekerja->id_perusahaan)
+                ->first();
+                return response()->json(['perusahaan' => $perusahaan, 'user' => $pekerja,'Role' => 'Pekerja']);
             }
         }else{
-            $token = $this->generateUniqueToken($admin->id,'Admin');
-            $loginSession = new SessionLoginAdmin;
-            $loginSession ->id_admin = $admin->id;
-            $loginSession ->token = $token;
-            $loginSession ->save();
-            return response()->json(['token' => $token,'user' => $admin,'Role' => 'Admin']);
+            // $token = $this->generateUniqueToken($admin->id,'Admin');
+            // $loginSession = new SessionLoginAdmin;
+            // $loginSession ->id_admin = $admin->id;
+            // $loginSession ->token = $token;
+            // $loginSession ->save();
+            $perusahaan = DB::table('perusahaan')
+                ->select('perusahaan.*')
+                ->where('perusahaan.id', $admin->id_perusahaan)
+                ->first();
+            return response()->json(['perusahaan' => $perusahaan,'user' => $admin,'Role' => 'Admin']);
         }
     }
 
@@ -72,39 +75,39 @@ class LoginController extends Controller
         return $token;
     }
 
-    public function validateToken(Request $request)
-    {
-        $token = $request->input('token');
-        $id = $request->input('id');
-        $role = $request->input('role');
-        if($role == 'Admin'){
-            $loginSession = SessionLoginAdmin::where('token', $token)
-                ->where('id_admin', $id)
-                ->first();
-            if ($loginSession && now()->isBefore($loginSession->created_at->addHours(8))) {
-                // Token is valid
-                $loginSession->update([
-                    'created_at' => now(), // Renew the token creation timestamp
-                ]);
-                return response()->json(['status' => 'valid']);
-            } else {
-                // Token is invalid or expired
-                return response()->json(['status' => 'invalid']);
-            }
-        }else{
-            $loginSession = SessionLoginPekerja::where('token', $token)
-                ->where('id_pekerja', $id)
-                ->first();
-            if ($loginSession && now()->isBefore($loginSession->created_at->addHours(8))) {
-                // Token is valid
-                $loginSession->update([
-                    'created_at' => now(), // Renew the token creation timestamp
-                ]);
-                return response()->json(['status' => 'valid']);
-            } else {
-                // Token is invalid or expired
-                return response()->json(['status' => 'invalid']);
-            }
-        }
-    }
+    // public function validateToken(Request $request)
+    // {
+    //     $token = $request->input('token');
+    //     $id = $request->input('id');
+    //     $role = $request->input('role');
+    //     if($role == 'Admin'){
+    //         $loginSession = SessionLoginAdmin::where('token', $token)
+    //             ->where('id_admin', $id)
+    //             ->first();
+    //         if ($loginSession && now()->isBefore($loginSession->created_at->addHours(8))) {
+    //             // Token is valid
+    //             $loginSession->update([
+    //                 'created_at' => now(), // Renew the token creation timestamp
+    //             ]);
+    //             return response()->json(['status' => 'valid']);
+    //         } else {
+    //             // Token is invalid or expired
+    //             return response()->json(['status' => 'invalid']);
+    //         }
+    //     }else{
+    //         $loginSession = SessionLoginPekerja::where('token', $token)
+    //             ->where('id_pekerja', $id)
+    //             ->first();
+    //         if ($loginSession && now()->isBefore($loginSession->created_at->addHours(8))) {
+    //             // Token is valid
+    //             $loginSession->update([
+    //                 'created_at' => now(), // Renew the token creation timestamp
+    //             ]);
+    //             return response()->json(['status' => 'valid']);
+    //         } else {
+    //             // Token is invalid or expired
+    //             return response()->json(['status' => 'invalid']);
+    //         }
+    //     }
+    // }
 }

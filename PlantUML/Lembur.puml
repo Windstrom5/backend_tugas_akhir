@@ -1,0 +1,23 @@
+@startuml
+!include Connection.puml
+
+class Lembur {
+    -id: integer
+    -id_pekerja: integer
+    -id_perusahaan: integer
+    -tanggal: date
+    -waktu_masuk: time
+    -waktu_pulang: time
+    -pekerjaan: string
+    -bukti: string
+    -status: string
+    +getDataPerusahaan($nama_perusahaan: string): JsonResponse
+    +getDataPekerja($nama_perusahaan: string, $nama_pekerja: string): JsonResponse
+    +store(Request $request): JsonResponse
+    +update(Request $request, $id: integer): JsonResponse
+    +updatestatus(Request $request): JsonResponse
+}
+
+
+
+@enduml

@@ -23,8 +23,11 @@ class PerusahaanController extends Controller
     {
         try {
             $nama = $request->input('nama');
-            $logoPath = $request->file('logo')->storeAs("perusahaan/{$nama}/logo",
-             time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
+            $logoPath = null;
+            if ($request->hasFile('logo')) {
+                $logoPath = $request->file('logo')->storeAs("perusahaan/{$nama}/logo",
+                time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
+            }
             $perusahaan = Perusahaan::create([
                 'nama' => $nama,
                 'latitude' => $request->input('latitude'),
@@ -35,13 +38,18 @@ class PerusahaanController extends Controller
                 'secret_key' => $request->input('secret_key'),
                 'logo' =>  $logoPath, 
             ]);
-            $perusahaanId = $perusahaan->getKey();
+            $perusahaanId = $perusahaan->id;
             return response()->json(['status' => 'success', 
             'message' => 'Perusahaan created successfully', 
             'profile_path' => $logoPath,
-            'perusahaan_id' => $perusahaanId]);
+            'id' => $perusahaanId]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Internal Server Error'], 500);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error creating Perusahaan',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
         }
     }
 
@@ -80,43 +88,85 @@ class PerusahaanController extends Controller
         }else{
             $admin = Admin::where('id_perusahaan', $perusahaan->id)->get();
             $pekerja = Pekerja::where('id_perusahaan', $perusahaan->id)->get();
+            $jumlahadmin= count($admin); // Calculate total number of administrators and workers
+            $jumlahPekerja = count($pekerja);
         }
         return response()->json([
             'perusahaan' => $perusahaan,
             'admin' => $admin->toArray(),
             'pekerja' => $pekerja->toArray(),
+            'jumlahadmin' => $jumlahadmin,
+            'jumlahpekerja' => $jumlahPekerja // Include the total count in the response
         ]);
     }
 
     // Update a specific perusahaan
     public function update(Request $request, $id)
     {
-        $perusahaan = Perusahaan::find($id);
+        try {
+            $perusahaan = Perusahaan::find($id);
+            if (!$perusahaan) {
+                return response()->json(['error' => 'Perusahaan not found'], 404);
+            }
+    
+            $updateData = [];
+    
+            if ($request->filled('nama')) {
+                $updateData['nama'] = $request->input('nama');
+            }
+    
+            if ($request->filled('latitude')) {
+                $updateData['latitude'] = $request->input('latitude');
+            }
+    
+            if ($request->filled('longitude')) {
+                $updateData['longitude'] = $request->input('longitude');
+            }
+    
+            if ($request->filled('batas_aktif')) {
+                $updateData['batas_aktif'] = $request->input('batas_aktif');
+            }
+    
+            if ($request->hasFile('logo')) {
+                // Upload new logo
+                $logoPath = $request->file('logo')->storeAs("perusahaan/{$perusahaan->nama}/logo",
+                    time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
+                $updateData['logo'] = $logoPath;
+            }
+    
+            $perusahaan->update($updateData);
+    
+            return response()->json(['status' => 'success', 'message' => 'Perusahaan updated successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Internal Server Error'], 500);
+        }
+    }
+    
+    public function getPerusahaanData($namaPerusahaan)
+    {
+        $perusahaan = Perusahaan::where('nama', $namaPerusahaan)->first();
 
         if (!$perusahaan) {
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
 
-        // Validate request data
-        $request->validate([
-            'nama' => 'required|string|max:255',
-            'latitude' => 'required|string|max:255',
-            'longitude' => 'required|string|max:255',
-            'batas_aktif' => 'required|date',
-        ]);
+        $pekerjaan = $perusahaan->pekerja;
+        $perusahaanData = [
+            'nama' => $perusahaan->nama,
+            'latitude' => $perusahaan->latitude,
+            'longitude' => $perusahaan->longitude,
+            'jam_masuk' => $perusahaan->jam_masuk,
+            'jam_keluar' => $perusahaan->jam_keluar,
+            'batas_aktif' => $perusahaan->batas_aktif,
+            'logo' => $this->getLogoUrl($pekerjaan->profile),
+            // Add other data as needed
+        ];
 
-        // Update the perusahaan
-        $perusahaan->update([
-            'nama' => $request->input('nama'),
-            'latitude' => $request->input('latitude'),
-            'longitude' => $request->input('longitude'),
-            'batas_aktif' => $request->input('batas_aktif'),
+        return response()->json([
+            'perusahaan_data' => $perusahaanData
         ]);
-
-        return response()->json(['status' => 'success', 'message' => 'Perusahaan updated successfully']);
     }
 
-    // Delete a specific perusahaan
     public function destroy($id)
     {
         $perusahaan = Perusahaan::find($id);
@@ -129,29 +179,5 @@ class PerusahaanController extends Controller
         $perusahaan->delete();
 
         return response()->json(['status' => 'success', 'message' => 'Perusahaan deleted successfully']);
-    }
-    
-    public function getPerusahaanData($namaPerusahaan)
-    {
-        $perusahaan = Perusahaan::where('nama', $namaPerusahaan)->first();
-
-        if (!$perusahaan) {
-            return response()->json(['error' => 'Perusahaan not found'], 404);
-        }
-
-        $pekerjaan = $perusahaan->pekerja;
-
-        $perusahaanData = [
-            'nama' => $perusahaan->nama,
-            'latitude' => $perusahaan->latitude,
-            'longitude' => $perusahaan->longitude,
-            'jam_masuk' => $perusahaan->jam_masuk,
-            'jam_keluar' => $perusahaan->jam_keluar,
-            'batas_aktif' => $perusahaan->batas_aktif,
-            'logo' => $this->getLogoUrl($pekerjaan->profile),
-            // Add other data as needed
-        ];
-
-        return response()->json($perusahaanData);
     }
 }

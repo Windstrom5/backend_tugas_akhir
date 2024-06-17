@@ -1,0 +1,27 @@
+@startuml
+!include Connection.puml
+class Perusahaan {
+    -id: integer
+    -nama: string
+    -latitude: decimal
+    -longitude: decimal
+    -jam_masuk: time
+    -jam_keluar: time
+    -batas_aktif: datetime
+    -logo: string
+    -secret_key: string
+    +index(): JsonResponse
+    +store(Request $request): JsonResponse
+    +getAllData(): JsonResponse
+    +show($nama_perusahaan: string): JsonResponse
+    +showAnggota($nama_perusahaan: string): JsonResponse
+    +update(Request $request, $id: integer): JsonResponse
+    +getPerusahaanData($namaPerusahaan: string): JsonResponse
+    +destroy($id: integer): JsonResponse
+}
+
+
+
+
+
+@enduml

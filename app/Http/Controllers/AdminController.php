@@ -12,6 +12,7 @@ class AdminController extends Controller
     public function store(Request $request)
     {
         try {
+            $profilePath = null;
             $perusahaan =  DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
             $namaPerusahaan = $perusahaan->nama;
             if (!$perusahaan) {
@@ -19,8 +20,14 @@ class AdminController extends Controller
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
             $nama = $request->input('nama');
-            $profilePath = $request->file('profile')->storeAs("perusahaan/{$namaPerusahaan}/Admin/{$nama}",
-            time() . '_' . $request->file('profile')->getClientOriginalName(), 'public');
+            if ($request->hasFile('profile')) {
+                $profilePath = $request->file('profile')->storeAs(
+                    "perusahaan/{$namaPerusahaan}/Admin/{$nama}",
+                    time() . '_' . $request->file('profile')->getClientOriginalName(),
+                    'public'
+                );
+            }
+    
             $admin = Admin::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
@@ -29,8 +36,7 @@ class AdminController extends Controller
                 'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'profile' => $profilePath,
             ]);
-
-            return response()->json(['status' => 'success', 'message' => 'Admin created successfully', 'file_path' => $profilePath]);
+            return response()->json(['status' => 'success', 'message' => 'Admin created successfully', 'admin' => $admin]);
         } catch (\Exception $e) {
             // Get the error message from the exception object
             $errorMessage = $e->getMessage();

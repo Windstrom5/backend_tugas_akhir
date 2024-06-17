@@ -1,0 +1,22 @@
+@startuml
+!include Connection.puml
+
+class Izin {
+    -id: integer
+    -id_pekerja: integer
+    -id_perusahaan: integer
+    -tanggal: date
+    -kategori: string
+    -alasan: string
+    -bukti: string
+    -status: string
+    +getDataPerusahaan($nama_perusahaan: string): JsonResponse
+    +getDataPekerja($nama_perusahaan: string, $nama_pekerja: string): JsonResponse
+    +store(Request $request): JsonResponse
+    +update(Request $request, $id: integer): JsonResponse
+    +updatestatus(Request $request): JsonResponse
+}
+
+
+
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+!include Connection.puml
+class Pekerja {
+    -id: integer
+    -id_perusahaan: integer
+    -email: string
+    -password: string
+    -nama: string
+    -tanggal_lahir: date
+    -profile: string
+    +checkEmail(email: string): JsonResponse
+    +store(Request $request): JsonResponse
+    +resetPassword(Request $request): JsonResponse
+    +updateData(Request $request, $id: integer): JsonResponse
+    +getPekerja($nama_perusahaan: string): JsonResponse
+    +login(Request $request): JsonResponse
+}
+
+
+
+
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+!include Connection.puml
+class Absen {
+    -id: integer
+    -id_pekerja: integer
+    -id_perusahaan: integer
+    -tanggal: date
+    -jam_masuk: time
+    -jam_keluar: time
+    -latitude: decimal
+    -longitude: decimal
+    +absen(Request $request): JsonResponse
+    +updateLocation(Request $request): JsonResponse
+    +getPekerjaLocation($nama_perusahaan: string): JsonResponse
+    +getData($nama_perusahaan: string, $nama_pekerja: string): JsonResponse
+}
+
+
+
+@enduml
