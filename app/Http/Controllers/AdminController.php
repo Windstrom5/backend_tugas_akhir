@@ -7,6 +7,8 @@ use App\Models\Perusahaan;
 use App\Models\Admin;
 use Illuminate\Support\Facades\DB;
 use App\Events\AdminUpdated;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 class AdminController extends Controller
 {
     public function store(Request $request)
@@ -15,23 +17,27 @@ class AdminController extends Controller
             $profilePath = null;
             $perusahaan =  DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
             $namaPerusahaan = $perusahaan->nama;
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
             if (!$perusahaan) {
                 // Handle case when Perusahaan is not found
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
             $nama = $request->input('nama');
             if ($request->hasFile('profile')) {
-                $profilePath = $request->file('profile')->storeAs(
-                    "perusahaan/{$namaPerusahaan}/Admin/{$nama}",
-                    time() . '_' . $request->file('profile')->getClientOriginalName(),
-                    'public'
-                );
+                $namaPerusahaan = $perusahaan->nama;
+                $fileContent = file_get_contents($request->file('profile')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
+                $profilePath = "perusahaan/{$namaPerusahaan}/Admin/{$nama}/{$fileName}";
+
+                Storage::disk('public')->put($profilePath, $encryptedContent);
             }
-    
+            // $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $hashedPassword = Hash::make($request->input('password'));
             $admin = Admin::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
-                'password' => md5($request->input('password')),
+                'password' => $hashedPassword,
                 'nama' => $nama,
                 'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'profile' => $profilePath,
@@ -68,41 +74,56 @@ class AdminController extends Controller
             return response()->json(['message' => $request->input('nama_perusahaan')], 404);
         }
     }
-    public function updateData(Request $request)
+    public function updateData(Request $request,$id)
     {
         try {
-            $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
-            $namaPerusahaan = $perusahaan->nama;
+            // Retrieve the admin record
+            $adminId = $id;
+            $admin = DB::table('admin')->where('id', $adminId)->first();
+            
+            if (!$admin) {
+                return response()->json(['error' => 'Admin not found'], 404);
+            }
+    
+            // Retrieve the associated perusahaan
+            $perusahaan = DB::table('perusahaan')->where('id', $admin->id_perusahaan)->first();
             if (!$perusahaan) {
-                // Handle case when Perusahaan is not found
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
-            $Admin = DB::table('admin')->findOrFail($request->input('id'));
-            $Admin->update([
-                'email' => $request->input('email'),
-                'nama' =>  $request->input('nama'),
-                'tanggal_lahir' => $request->input('tanggal_lahir'),
-            ]);
+    
+            // Prepare data to update
+            $updateData = [];
+            if ($request->filled('nama')) {
+                $updateData['nama'] = $request->input('nama');
+            }
+            if ($request->filled('email')) {
+                $updateData['email'] = $request->input('email');
+            }
+            if ($request->filled('tanggal_lahir')) {
+                $updateData['tanggal_lahir'] = $request->input('tanggal_lahir');
+            }
+    
             // Handle file upload for the profile field
             if ($request->hasFile('profile')) {
-                $profilePath = $request->file('profile')->storeAs(
-                    "perusahaan/{$namaPerusahaan}/Admin/{$Admin->nama}",
-                    time() . '_' . $request->file('profile')->getClientOriginalName(),
-                    'public'
-                );
-                // Update the profile field in the database
-                $Admin->update(['profile' => $profilePath]);
+                $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+                $namaPerusahaan = $perusahaan->nama;
+                $fileContent = file_get_contents($request->file('profile')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
+                $profilePath = "perusahaan/{$namaPerusahaan}/Admin/{$admin->nama}/{$fileName}";
+    
+                Storage::disk('public')->put($profilePath, $encryptedContent);
             }
-            broadcast(new AdminUpdated($namaPerusahaan,$Admin));
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Admin updated successfully',
-                'Admin' => $Admin,
-            ]);
+    
+            // Update the admin record
+            DB::table('admin')->where('id', $adminId)->update($updateData);
+    
+            return response()->json(['status' => 'success', 'message' => 'Admin updated successfully']);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+    
 
     public function promote(Request $request){
         $pekerjadata = DB::table('pekerja')
@@ -130,6 +151,37 @@ class AdminController extends Controller
         } else {
             // Return error response if data not found
             return response()->json(['error' => 'Data not found'], 404);
+        }
+    }
+    public function getDecryptedProfile($AdminId)
+    {
+        try {
+            $Admin = Admin::where('id', $AdminId)->first();
+
+            if (!$Admin) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Admin not found'
+                ], 404);
+            }
+
+            // Read the encrypted file content
+            $encryptedContent = Storage::disk('public')->get($Admin->profile);
+
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+
+            // Return the decrypted file content
+            return response($decryptedContent, 200)
+                ->header('Content-Type', 'image/jpeg'); // Adjust header according to file type
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error decrypting profile',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
         }
     }
 }

@@ -13,17 +13,18 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $email = $request->input('email');
-        $password = $request->input('password');
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+        $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
         $admin = DB::table('admin')
         ->select('admin.*')
         ->where('admin.email', $email)
-        ->where('admin.password', md5($password))
+        ->where('admin.password', $encryptedPassword)
         ->first();
         if (!$admin) {
             $pekerja = DB::table('pekerja')
             ->select('pekerja.*')
             ->where('pekerja.email', $email)
-            ->where('pekerja.password', md5($password))
+            ->where('pekerja.password', $encryptedPassword)
             ->first();
             if (!$pekerja){
                 return response()->json(['error' => 'not found'], 500);
@@ -52,7 +53,63 @@ class LoginController extends Controller
             return response()->json(['perusahaan' => $perusahaan,'user' => $admin,'Role' => 'Admin']);
         }
     }
-
+    public function getData(Request $request)
+    {
+        $id = $request->input('id');
+        $jenis = $request->input('jenis');
+        $presensiId = $request->input('id_presensi');  // Note: $presensiId can be null
+    
+        if($jenis == "Admin"){
+            $admin = DB::table('admin')
+                ->select('admin.*')
+                ->where('admin.id', $id)
+                ->first();
+            $perusahaan = DB::table('perusahaan')
+                ->select('perusahaan.*')
+                ->where('perusahaan.id', $admin->id_perusahaan)
+                ->first();
+            return response()->json(['perusahaan' => $perusahaan, 'user' => $admin, 'Role' => 'Admin']);
+        } else {
+            $pekerja = DB::table('pekerja')
+                ->select('pekerja.*')
+                ->where('pekerja.id', $id)
+                ->first();
+            
+            if (!$pekerja) {
+                return response()->json(['error' => 'not found'], 500);
+            } else {
+                $perusahaan = DB::table('perusahaan')
+                    ->select('perusahaan.*')
+                    ->where('perusahaan.id', $pekerja->id_perusahaan)
+                    ->first();
+    
+                // Check if presensiId is provided and fetch presensi only if it's not null
+                if ($presensiId !== null) {
+                    $presensi = DB::table('absen')
+                        ->select('absen.*')
+                        ->where('absen.id', $presensiId)
+                        ->first();
+                } else {
+                    $presensi = null;
+                }
+    
+                // Prepare the response
+                $response = [
+                    'perusahaan' => $perusahaan,
+                    'user' => $pekerja,
+                    'Role' => 'Pekerja'
+                ];
+    
+                // Add presensi data only if it exists
+                if ($presensi) {
+                    $response['presensi'] = $presensi;
+                }
+    
+                return response()->json($response);
+            }
+        }
+    }
+    
     private function generateUniqueToken($Id_User,$role)
     {
         do {

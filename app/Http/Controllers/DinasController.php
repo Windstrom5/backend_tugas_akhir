@@ -7,6 +7,7 @@ use App\Models\Dinas;
 use Illuminate\Support\Facades\DB;
 use App\Events\DinasUpdated;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 class DinasController extends Controller
 {
     public function index()
@@ -17,13 +18,18 @@ class DinasController extends Controller
 
     public function store(Request $request){
         $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         if (!$perusahaan) {
             // Handle case when Perusahaan is not found
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
         $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
-        $buktiPath = $request->file('bukti')->storeAs("perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Dinas/Bukti",
-        time() . '_' . $request->file('bukti')->getClientOriginalName(), 'public');
+        $fileContent = file_get_contents($request->file('logo')->getRealPath());
+        $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+        $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
+        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Dinas/Bukti/{$fileName}";
+
+        Storage::disk('public')->put($buktiPath, $encryptedContent);
         $Dinas = Dinas::create([
             'id_perusahaan' => $perusahaan->id,
             'id_pekerja' => $pekerja->id,
@@ -33,12 +39,12 @@ class DinasController extends Controller
             'kegiatan' => $request->input('kegiatan'),
             'bukti' => $buktiPath
         ]);
-        event(new DinasUpdated($perusahaan->nama, $Dinas));
+        // event(new DinasUpdated($perusahaan->nama, $Dinas));
         return response()->json(['status' => 'success', 
         'message' => 'pekerja created successfully']);
     }
     public function update(Request $request, $id){
-        // Find the existing dinas record by ID
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         $dinas = DB::table('dinas')
             ->join('perusahaan', 'dinas.id_perusahaan', '=', 'perusahaan.id')
             ->join('pekerja', 'dinas.id_pekerja', '=', 'pekerja.id')
@@ -55,11 +61,12 @@ class DinasController extends Controller
         if ($request->hasFile('bukti')) {
             $buktiPath = public_path("storage/{$dinas->bukti}");
             File::delete($buktiPath);    
-            $buktiPath = $request->file('bukti')->storeAs(
-                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/dinas/Bukti",
-                time() . '_' . $request->file('bukti')->getClientOriginalName(),
-                'public'
-            );
+            $fileContent = file_get_contents($request->file('logo')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
+            $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Dinas/Bukti/{$fileName}";
+    
+            Storage::disk('public')->put($buktiPath, $encryptedContent);
             $dinas->bukti = $buktiPath;
             DB::table('dinas')
             ->where('id', $id)
@@ -129,4 +136,36 @@ class DinasController extends Controller
     //         ->first();
     //     return response()->json(['data' => $pekerja]);    
     // }
+
+    public function getDecryptedBukti($DinasId)
+    {
+        try {
+            $Dinas = Dinas::where('id', $DinasId)->first();
+
+            if (!$Dinas) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Admin not found'
+                ], 404);
+            }
+
+            // Read the encrypted file content
+            $encryptedContent = Storage::disk('public')->get($Dinas->bukti);
+
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+
+            // Return the decrypted file content
+            return response($decryptedContent, 200)
+            ->header('Content-Type', 'application/pdf'); // PDF content type
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error decrypting profile',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
 }

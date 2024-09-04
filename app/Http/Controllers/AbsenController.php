@@ -57,8 +57,6 @@ class AbsenController extends Controller
                 return response()->json(['status' => 'success', 'message' => 'Absen Started']);
             }
         } catch (\Exception $e) {
-
-            // Return an error response
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
@@ -73,13 +71,14 @@ class AbsenController extends Controller
         ->update([
             'latitude' => $request->input('latitude'),
             'longitude' => $request->input('longitude'),
+            'updated_at' => $request->input('timestamp'), // This ensures that the timestamp is updated
         ]);
-        $perusahaanData = DB::table('perusahaan')
-            ->where('id', $this-> $affectedRows->id_perusahaan)
-            ->first();
+        // $perusahaanData = DB::table('perusahaan')
+        //     ->where('id', $this-> $affectedRows->id_perusahaan)
+        //     ->first();
         if ($affectedRows > 0) {
             // Broadcast the location update event
-            broadcast(new LocationUpdated($affectedRows, $perusahaanData->nama));
+            // broadcast(new LocationUpdated($affectedRows, $perusahaanData->nama));
             
             return response()->json([
                 'status' => 'success',

@@ -9,14 +9,22 @@ use App\Models\Admin;
 use App\Models\Pekerja;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
-
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 class PerusahaanController extends Controller
 {
     // Show a list of all perusahaan
     public function index()
     {
-        $perusahaan = Perusahaan::all();
-        return response()->json(['perusahaan' => $perusahaan]);
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+        $perusahaans = Perusahaan::all();
+
+        $decryptedPerusahaans = $perusahaans->map(function ($perusahaan) use ($encryptionKey) {
+            $perusahaan->secret_key = openssl_decrypt($perusahaan->secret_key, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            return $perusahaan;
+        });
+
+        return response()->json(['perusahaan' => $decryptedPerusahaans]);
     }
 
     public function store(Request $request)
@@ -24,10 +32,18 @@ class PerusahaanController extends Controller
         try {
             $nama = $request->input('nama');
             $logoPath = null;
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
             if ($request->hasFile('logo')) {
-                $logoPath = $request->file('logo')->storeAs("perusahaan/{$nama}/logo",
-                time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
+                $fileContent = file_get_contents($request->file('logo')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
+                $logoPath = "perusahaan/{$nama}/logo/{$fileName}";
+    
+                Storage::disk('public')->put($logoPath, $encryptedContent);
             }
+            $secretKey = $request->input('secret_key');
+            // $encryptedSecretKey = openssl_encrypt($secretKey, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $encryptedSecretKey = Hash::make($request->input('password'));
             $perusahaan = Perusahaan::create([
                 'nama' => $nama,
                 'latitude' => $request->input('latitude'),
@@ -35,7 +51,7 @@ class PerusahaanController extends Controller
                 'jam_masuk' => $request->input('jam_masuk'),
                 'jam_keluar' => $request->input('jam_keluar'),
                 'batas_aktif' => $request->input('batas_aktif'),
-                'secret_key' => $request->input('secret_key'),
+                'secret_key' => $encryptedSecretKey,
                 'logo' =>  $logoPath, 
             ]);
             $perusahaanId = $perusahaan->id;
@@ -58,7 +74,38 @@ class PerusahaanController extends Controller
         return response()->json($data);
     }
     
+    public function getDecryptedLogo($perusahaanId)
+    {
+        try {
+            $perusahaan = Perusahaan::where('id', $perusahaanId)->first();
 
+            if (!$perusahaan) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Perusahaan not found'
+                ], 404);
+            }
+
+            // Read the encrypted file content
+            $encryptedContent = Storage::disk('public')->get($perusahaan->logo);
+
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+
+            // Return the decrypted file content
+            return response($decryptedContent, 200)
+                ->header('Content-Type', 'image/jpeg'); // Adjust header according to file type
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error decrypting logo',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+    
     private function generateSecretKey()
     {
         do {
@@ -80,6 +127,7 @@ class PerusahaanController extends Controller
         }
         return response()->json(['perusahaan' => $perusahaan]);
     }
+    
     public function showAnggota($nama_perusahaan)
     {
         $perusahaan = Perusahaan::where('nama', $nama_perusahaan)->first();
@@ -108,11 +156,12 @@ class PerusahaanController extends Controller
             if (!$perusahaan) {
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
-    
+            $nama = $perusahaan->nama;
             $updateData = [];
     
             if ($request->filled('nama')) {
                 $updateData['nama'] = $request->input('nama');
+                $nama = $request->input('nama');
             }
     
             if ($request->filled('latitude')) {
@@ -128,10 +177,13 @@ class PerusahaanController extends Controller
             }
     
             if ($request->hasFile('logo')) {
-                // Upload new logo
-                $logoPath = $request->file('logo')->storeAs("perusahaan/{$perusahaan->nama}/logo",
-                    time() . '_' . $request->file('logo')->getClientOriginalName(), 'public');
-                $updateData['logo'] = $logoPath;
+                $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+                $fileContent = file_get_contents($request->file('logo')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
+                $logoPath = "perusahaan/{$nama}/logo/{$fileName}";
+    
+                Storage::disk('public')->put($logoPath, $encryptedContent);
             }
     
             $perusahaan->update($updateData);
@@ -150,20 +202,20 @@ class PerusahaanController extends Controller
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
 
-        $pekerjaan = $perusahaan->pekerja;
-        $perusahaanData = [
-            'nama' => $perusahaan->nama,
-            'latitude' => $perusahaan->latitude,
-            'longitude' => $perusahaan->longitude,
-            'jam_masuk' => $perusahaan->jam_masuk,
-            'jam_keluar' => $perusahaan->jam_keluar,
-            'batas_aktif' => $perusahaan->batas_aktif,
-            'logo' => $this->getLogoUrl($pekerjaan->profile),
-            // Add other data as needed
-        ];
+        // $pekerjaan = $perusahaan->pekerja;
+        // $perusahaanData = [
+        //     'nama' => $perusahaan->nama,
+        //     'latitude' => $perusahaan->latitude,
+        //     'longitude' => $perusahaan->longitude,
+        //     'jam_masuk' => $perusahaan->jam_masuk,
+        //     'jam_keluar' => $perusahaan->jam_keluar,
+        //     'batas_aktif' => $perusahaan->batas_aktif,
+        //     'logo' => $this->getLogoUrl($pekerjaan->profile),
+        //     // Add other data as needed
+        // ];
 
         return response()->json([
-            'perusahaan_data' => $perusahaanData
+            'perusahaan_data' => $perusahaan
         ]);
     }
 

@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'driver' => 'bcrypt',
+    // 'driver' => 'bcrypt',
 
     /*
     |--------------------------------------------------------------------------
@@ -44,11 +44,12 @@ return [
     |
     */
 
+    'driver' => 'argon2id', // Use Argon2id as the default hashing algorithm
+
     'argon' => [
-        'memory' => 65536,
-        'threads' => 1,
-        'time' => 4,
-        'verify' => true,
+        'memory' => 1024, // Amount of memory in KB that will be used
+        'threads' => 2, // Number of threads to use
+        'time' => 2, // Number of iterations
     ],
 
 ];

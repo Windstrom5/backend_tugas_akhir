@@ -38,13 +38,18 @@ class IzinController extends Controller
     
     public function store(Request $request){
         $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         if (!$perusahaan) {
             // Handle case when Perusahaan is not found
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
         $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
-        $buktiPath = $request->file('bukti')->storeAs("perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Izin/Bukti",
-        time() . '_' . $request->file('bukti')->getClientOriginalName(), 'public');
+        $fileContent = file_get_contents($request->file('logo')->getRealPath());
+        $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+        $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
+        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Izin/Bukti/{$fileName}";
+
+        Storage::disk('public')->put($buktiPath, $encryptedContent);
         $Izin = Izin::create([
             'id_perusahaan' => $perusahaan->id,
             'id_pekerja' => $pekerja->id,
@@ -116,4 +121,70 @@ class IzinController extends Controller
             return response()->json(['error' => 'Izin record not found'], 404);
         }
     }
+
+    public function getDecryptedBukti($IzinId)
+    {
+        try {
+            // Retrieve the Izin record from the database
+            $Izin = Izin::where('id', $IzinId)->first();
+    
+            // Check if the Izin record exists
+            if (!$Izin) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Izin record not found'
+                ], 404);
+            }
+    
+            // Read the encrypted file content from storage
+            $encryptedContent = Storage::disk('public')->get($Izin->bukti);
+    
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $iv = substr($encryptionKey, 0, 16); // Initialization vector (IV) should be 16 bytes long
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, OPENSSL_RAW_DATA, $iv);
+    
+            // Check if decryption was successful
+            if ($decryptedContent === false) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error decrypting the file content'
+                ], 500);
+            }
+    
+            // Determine the file type based on the file extension or other metadata
+            $fileExtension = pathinfo($Izin->bukti, PATHINFO_EXTENSION);
+            $contentType = '';
+    
+            switch (strtolower($fileExtension)) {
+                case 'pdf':
+                    $contentType = 'application/pdf';
+                    break;
+                case 'jpg':
+                case 'jpeg':
+                    $contentType = 'image/jpeg';
+                    break;
+                case 'png':
+                    $contentType = 'image/png';
+                    break;
+                case 'gif':
+                    $contentType = 'image/gif';
+                    break;
+                default:
+                    $contentType = 'application/octet-stream'; // Fallback for unknown file types
+            }
+    
+            // Return the decrypted content with the correct content type
+            return response($decryptedContent, 200)
+                ->header('Content-Type', $contentType);
+    
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error processing the request',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }    
 }

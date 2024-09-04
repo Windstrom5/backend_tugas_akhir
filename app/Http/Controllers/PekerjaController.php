@@ -47,23 +47,26 @@ class PekerjaController extends Controller
             $profilePath = null;
             $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
             $namaPerusahaan = $perusahaan->nama;
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
             if (!$perusahaan) {
                 // Handle case when Perusahaan is not found
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
             $nama = $request->input('nama');
             if ($request->hasFile('profile')) {
-                $profilePath = $request->file('profile')->storeAs(
-                    "perusahaan/{$namaPerusahaan}/Admin/{$nama}",
-                    time() . '_' . $request->file('profile')->getClientOriginalName(),
-                    'public'
-                );
+                $fileContent = file_get_contents($request->file('profile')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
+                $profilePath = "perusahaan/{$namaPerusahaan}/Pekerja/{$nama}/{$fileName}";
+    
+                Storage::disk('public')->put($profilePath, $encryptedContent);
             }
+            $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $pekerja = Pekerja::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
-                'password' => md5($request->input('password')),
-                'nama' => $nama,
+                'password' => $encryptedPassword,
+                'nama' => $request->input('nama'),
                 'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'profile' => $profilePath
             ]);
@@ -73,7 +76,7 @@ class PekerjaController extends Controller
                 'status' => 'success',
                 'message' => 'pekerja created successfully',
                 'profile_path' => $profilePath,
-                'perusahaan_id' => $perusahaan->id
+                '$pekerja_Id ' => $pekerjaId
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -83,12 +86,13 @@ class PekerjaController extends Controller
     public function resetPassword(Request $request)
     {
         try {
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
             // Check if the provided email belongs to a worker (pekerja)
             $pekerja = Pekerja::where("email", $request->input('email'))->first();
             if ($pekerja != null) {
-                // Update the password for the worker
+                $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $pekerja->update([
-                    'password' => md5($request->input('password'))
+                    'password' => $encryptedPassword
                 ]);
                 // Return success response
                 return response()->json([
@@ -97,13 +101,13 @@ class PekerjaController extends Controller
                     'pekerja' => $pekerja,
                 ]);
             }
-
             // Check if the provided email belongs to an admin
             $admin = Admin::where("email", $request->input('email'))->first();
             if ($admin != null) {
                 // Update the password for the admin
+                $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $admin->update([
-                    'password' => md5($request->input('password'))
+                    'password' => $encryptedPassword
                 ]);
                 // Return success response
                 return response()->json([
@@ -112,7 +116,6 @@ class PekerjaController extends Controller
                     'admin' => $admin,
                 ]);
             }
-
             // If neither a worker nor an admin was found with the provided email
             return response()->json([
                 'status' => 'error',
@@ -124,41 +127,86 @@ class PekerjaController extends Controller
         }
     }
 
+    public function getDecryptedProfile($pekerjaId)
+    {
+        try {
+            $pekerja = Pekerja::where('id', $pekerjaId)->first();
+
+            if (!$pekerja) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Pekerja not found'
+                ], 404);
+            }
+
+            // Read the encrypted file content
+            $encryptedContent = Storage::disk('public')->get($pekerja->profile);
+
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+
+            // Return the decrypted file content
+            return response($decryptedContent, 200)
+                ->header('Content-Type', 'image/jpeg'); // Adjust header according to file type
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error decrypting profile',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
 
     public function updateData(Request $request, $id)
     {
+        try {
+            $pekerja = Pekerja::where("id", $id)
+                ->first();
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $nama = $pekerja->nama;
+            if (!$pekerja) {
+                return response()->json(['error' => $request->input('nama')], 404);
+            }
+            $perusahaan = DB::table('perusahaan')->where('perusahaan.id', $pekerja->id_perusahaan)->first();
+            if (!$perusahaan) {
+                // Handle case when Perusahaan is not found
+                return response()->json(['error' => $request->all()], 404);
+            }
+            // $pekerja->update([
+            //     'email' => $request->input('email'),
+            //     'nama' =>  $request->input('nama'),
+            //     'tanggal_lahir' => $request->input('tanggal_lahir'),
+            // ]);
+            if ($request->filled('nama')) {
+                $updateData['nama'] = $request->input('nama');
+                $nama = $request->input('nama');
+            }
 
-        $pekerja = Pekerja::where("id", $id)
-            ->first();
-        if (!$pekerja) {
-            return response()->json(['error' => $request->input('nama')], 404);
+            if ($request->filled('email')) {
+                $updateData['email'] = $request->input('email');
+            }
+
+            if ($request->filled('tanggal_lahir')) {
+                $updateData['tanggal_lahir'] = $request->input('tanggal_lahir');
+            }
+
+            if ($request->hasFile('profile')) {
+                $namaPerusahaan = $perusahaan->nama;
+                $fileContent = file_get_contents($request->file('profile')->getRealPath());
+                $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
+                $profilePath = "perusahaan/{$namaPerusahaan}/Pekerja/{$nama}/{$fileName}";
+
+                Storage::disk('public')->put($profilePath, $encryptedContent);
+            }
+            // broadcast(new PekerjaUpdated($pekerja, $perusahaan->nama, 'Pekerja'));
+            $perusahaan->update($updateData);
+            return response()->json(['status' => 'success', 'message' => 'Pekerja updated successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Internal Server Error'], 500);
         }
-        $perusahaan = DB::table('perusahaan')->where('perusahaan.id', $pekerja->id_perusahaan)->first();
-        if (!$perusahaan) {
-            // Handle case when Perusahaan is not found
-            return response()->json(['error' => $request->all()], 404);
-        }
-        $pekerja->update([
-            'email' => $request->input('email'),
-            'nama' =>  $request->input('nama'),
-            'tanggal_lahir' => $request->input('tanggal_lahir'),
-        ]);
-        // Handle file upload for the profile field
-        if ($request->hasFile('profile')) {
-            $profilePath = $request->file('profile')->storeAs(
-                "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}",
-                time() . '_' . $request->file('profile')->getClientOriginalName(),
-                'public'
-            );
-            // Update the profile field in the database
-            $pekerja->update(['profile' => $profilePath]);
-        }
-        broadcast(new PekerjaUpdated($pekerja, $perusahaan->nama, 'Pekerja'));
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Pekerja updated successfully',
-            'pekerja' => $pekerja,
-        ]);
     }
 
     public function getPekerja($nama_perusahaan)

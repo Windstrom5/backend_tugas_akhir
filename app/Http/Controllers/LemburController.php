@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Lembur;
+use App\Models\session_lembur;
 use App\Events\LemburUpdated;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 class LemburController extends Controller
 {
@@ -37,6 +38,7 @@ class LemburController extends Controller
 
     public function store(Request $request){
         $perusahaan = DB::table('perusahaan')->where('perusahaan.nama', $request->input('nama_perusahaan'))->first();
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         if (!$perusahaan) {
             // Handle case when Perusahaan is not found
             return response()->json(['error' => 'Perusahaan not found'], 404);
@@ -50,8 +52,12 @@ class LemburController extends Controller
             return response()->json(['error' => 'Invalid time'], 400);
         }else{
             $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
-            $buktiPath = $request->file('bukti')->storeAs("perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Lembur/Bukti",
-            time() . '_' . $request->file('bukti')->getClientOriginalName(), 'public');
+            $fileContent = file_get_contents($request->file('logo')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
+            $date = date('Y-m-d');
+            $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Lembur/{$date}/Bukti/Sesi/1/{$fileName}";
+            Storage::disk('public')->put($buktiPath, $encryptedContent);
             $lembur = Lembur::create([
                 'id_perusahaan' => $perusahaan->id,
                 'id_pekerja' => $pekerja->id,
@@ -61,7 +67,14 @@ class LemburController extends Controller
                 'pekerjaan' =>  $request->input('pekerjaan'),
                 'bukti' => $buktiPath
             ]);
-            event(new LemburUpdated($lembur));
+            $session = session_lembur::create([
+                'id_lembur' => $request->input('id_lembur'),
+                'jam'=> $request->input('jam'),
+                'keterangan'=> $request->input('keterangan'),
+                'bukti'=> $request->input('bukti'),
+            ]);
+
+            // event(new LemburUpdated($lembur));
             return response()->json(['status' => 'success', 
             'message' => 'Absen created successfully']);
         }
@@ -85,7 +98,7 @@ class LemburController extends Controller
         }
     }
     public function update(Request $request, $id){
-        // Find the existing lembur record by ID
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         $lembur = DB::table('lembur')
             ->join('perusahaan', 'lembur.id_perusahaan', '=', 'perusahaan.id')
             ->join('pekerja', 'lembur.id_pekerja', '=', 'pekerja.id')
@@ -100,13 +113,11 @@ class LemburController extends Controller
         $perusahaanNama = $lembur->perusahaan_nama;
         $pekerjaNama = $lembur->pekerja_nama;
         if ($request->hasFile('bukti')) {
-            $buktiPath = public_path("storage/{$lembur->bukti}");
-            File::delete($buktiPath);    
-            $buktiPath = $request->file('bukti')->storeAs(
-                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/lembur/Bukti",
-                time() . '_' . $request->file('bukti')->getClientOriginalName(),
-                'public'
-            );
+            $fileContent = file_get_contents($request->file('logo')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
+            $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Lembur/Bukti/{$fileName}";
+            Storage::disk('public')->put($buktiPath, $encryptedContent);
             $lembur->bukti = $buktiPath;
             DB::table('lembur')
             ->where('id', $id)
@@ -121,5 +132,47 @@ class LemburController extends Controller
             'pekerjaan' => $request->input('pekerjaan'),
         ]);
         return response()->json(['status' => 'success', 'message' => 'lembur updated successfully']);
+    }
+
+    public function updatesession(Request $request){
+        $session = session_lembur::create([
+            'id_lembur' => $request->input('id_lembur'),
+            'jam'=> $request->input('jam'),
+            'keterangan'=> $request->input('keterangan'),
+            'bukti'=> $request->input('bukti'),
+            'status'
+        ]);
+    }
+
+    public function getDecryptedBukti($LemburId)
+    {
+        try {
+            $Lembur = Lembur::where('id', $LemburId)->first();
+
+            if (!$Lembur) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Admin not found'
+                ], 404);
+            }
+
+            // Read the encrypted file content
+            $encryptedContent = Storage::disk('public')->get($Lembur->bukti);
+
+            // Decrypt the file content
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+
+            // Return the decrypted file content
+            return response($decryptedContent, 200)
+                ->header('Content-Type', 'image/jpeg'); // Adjust header according to file type
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error decrypting profile',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
     }
 }
