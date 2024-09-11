@@ -159,53 +159,68 @@ class PekerjaController extends Controller
         }
     }
 
-    public function updateData(Request $request, $id)
+    public function updateData(Request $request,$id)
     {
         try {
-            $pekerja = Pekerja::where("id", $id)
-                ->first();
-            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
-            $nama = $pekerja->nama;
+            // Retrieve the admin record
+            $pekerjaId = $id;
+            $pekerja = DB::table('pekerja')->where('id', $pekerjaId)->first();
+            
             if (!$pekerja) {
-                return response()->json(['error' => $request->input('nama')], 404);
+                return response()->json(['error' => 'Pekerja not found'], 404);
             }
-            $perusahaan = DB::table('perusahaan')->where('perusahaan.id', $pekerja->id_perusahaan)->first();
+    
+            // Retrieve the associated perusahaan
+            $perusahaan = DB::table('perusahaan')->where('id', $pekerja->id_perusahaan)->first();
             if (!$perusahaan) {
-                // Handle case when Perusahaan is not found
-                return response()->json(['error' => $request->all()], 404);
+                return response()->json(['error' => 'Perusahaan not found'], 404);
             }
-            // $pekerja->update([
-            //     'email' => $request->input('email'),
-            //     'nama' =>  $request->input('nama'),
-            //     'tanggal_lahir' => $request->input('tanggal_lahir'),
-            // ]);
+    
+            // Prepare data to update
+            $updateData = [];
             if ($request->filled('nama')) {
                 $updateData['nama'] = $request->input('nama');
-                $nama = $request->input('nama');
             }
-
             if ($request->filled('email')) {
                 $updateData['email'] = $request->input('email');
             }
-
             if ($request->filled('tanggal_lahir')) {
                 $updateData['tanggal_lahir'] = $request->input('tanggal_lahir');
             }
-
+    
+            // Handle file upload for the profile field
             if ($request->hasFile('profile')) {
+                if (!empty($pekerja->profile) && Storage::disk('public')->exists($pekerja->profile)) {
+                    Storage::disk('public')->delete($pekerja->profile);
+            
+                    // Get the directory of the previous profile image
+                    $directory = dirname($pekerja->profile);
+            
+                    // Check if the directory is empty
+                    $files = Storage::disk('public')->files($directory);
+                    if (empty($files)) {
+                        Storage::disk('public')->deleteDirectory($directory);
+                    }
+                }
+            
+                $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
                 $namaPerusahaan = $perusahaan->nama;
                 $fileContent = file_get_contents($request->file('profile')->getRealPath());
                 $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
-                $profilePath = "perusahaan/{$namaPerusahaan}/Pekerja/{$nama}/{$fileName}";
-
+                $profilePath = "perusahaan/{$namaPerusahaan}/Pekerja/{$pekerja->nama}/{$fileName}";
+                $updateData['profile'] = $profilePath;
+            
                 Storage::disk('public')->put($profilePath, $encryptedContent);
             }
-            // broadcast(new PekerjaUpdated($pekerja, $perusahaan->nama, 'Pekerja'));
-            $perusahaan->update($updateData);
-            return response()->json(['status' => 'success', 'message' => 'Pekerja updated successfully']);
+    
+            // Update the admin record
+            DB::table('pekerja')->where('id', $pekerjaId)->update($updateData);
+            $updatedPekerja = DB::table('pekerja')->where('id', $pekerjaId)->first();
+
+            return response()->json(['status' => 'success', 'message' => 'Pekerja updated successfully', 'pekerja' => $updatedPekerja]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Internal Server Error'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 

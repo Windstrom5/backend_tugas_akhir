@@ -18,6 +18,7 @@ class Perusahaan extends Model
         'batas_aktif',
         'logo',
         'secret_key',
+        'holiday',
     ];
     public $timestamps = true; // This enables automatic timestamping
     const CREATED_AT = 'created_at'; // Customize the column name if needed

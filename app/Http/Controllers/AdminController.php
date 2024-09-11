@@ -105,20 +105,36 @@ class AdminController extends Controller
     
             // Handle file upload for the profile field
             if ($request->hasFile('profile')) {
+                // Delete the previous profile image if it exists
+                if (!empty($admin->profile) && Storage::disk('public')->exists($admin->profile)) {
+                    Storage::disk('public')->delete($admin->profile);
+            
+                    // Get the directory of the previous profile image
+                    $directory = dirname($admin->profile);
+            
+                    // Check if the directory is empty
+                    $files = Storage::disk('public')->files($directory);
+                    if (empty($files)) {
+                        Storage::disk('public')->deleteDirectory($directory);
+                    }
+                }
+            
                 $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
                 $namaPerusahaan = $perusahaan->nama;
                 $fileContent = file_get_contents($request->file('profile')->getRealPath());
                 $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $fileName = time() . '_' . $request->file('profile')->getClientOriginalName();
                 $profilePath = "perusahaan/{$namaPerusahaan}/Admin/{$admin->nama}/{$fileName}";
-    
+                $updateData['profile'] = $profilePath;
+            
                 Storage::disk('public')->put($profilePath, $encryptedContent);
-            }
+            }            
     
             // Update the admin record
             DB::table('admin')->where('id', $adminId)->update($updateData);
-    
-            return response()->json(['status' => 'success', 'message' => 'Admin updated successfully']);
+            $updatedAdmin = DB::table('admin')->where('id', $adminId)->first();
+
+            return response()->json(['status' => 'success', 'message' => 'Admin updated successfully', 'admin' => $updatedAdmin]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }

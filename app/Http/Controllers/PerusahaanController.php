@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
+
 class PerusahaanController extends Controller
 {
     // Show a list of all perusahaan
@@ -38,7 +40,7 @@ class PerusahaanController extends Controller
                 $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
                 $logoPath = "perusahaan/{$nama}/logo/{$fileName}";
-    
+
                 Storage::disk('public')->put($logoPath, $encryptedContent);
             }
             $secretKey = $request->input('secret_key');
@@ -52,13 +54,16 @@ class PerusahaanController extends Controller
                 'jam_keluar' => $request->input('jam_keluar'),
                 'batas_aktif' => $request->input('batas_aktif'),
                 'secret_key' => $encryptedSecretKey,
-                'logo' =>  $logoPath, 
+                'logo' =>  $logoPath,
+                'holiday' => $request->input('holiday'),
             ]);
             $perusahaanId = $perusahaan->id;
-            return response()->json(['status' => 'success', 
-            'message' => 'Perusahaan created successfully', 
-            'profile_path' => $logoPath,
-            'id' => $perusahaanId]);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Perusahaan created successfully',
+                'profile_path' => $logoPath,
+                'id' => $perusahaanId
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -69,11 +74,12 @@ class PerusahaanController extends Controller
         }
     }
 
-    public function getAllData() {
+    public function getAllData()
+    {
         $data = Perusahaan::all();
         return response()->json($data);
     }
-    
+
     public function getDecryptedLogo($perusahaanId)
     {
         try {
@@ -90,7 +96,7 @@ class PerusahaanController extends Controller
             $encryptedContent = Storage::disk('public')->get($perusahaan->logo);
 
             // Decrypt the file content
-            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
             $decryptedContent = openssl_decrypt($encryptedContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
 
             // Return the decrypted file content
@@ -105,7 +111,7 @@ class PerusahaanController extends Controller
             ], 500);
         }
     }
-    
+
     private function generateSecretKey()
     {
         do {
@@ -114,7 +120,7 @@ class PerusahaanController extends Controller
             $encryptedToken = Crypt::encryptString($token);
             $exists = DB::table('perusahaan')->where('secret_key', $encryptedToken)->exists();
         } while ($exists);
-    
+
         return $encryptedToken;
     }
 
@@ -127,16 +133,16 @@ class PerusahaanController extends Controller
         }
         return response()->json(['perusahaan' => $perusahaan]);
     }
-    
+
     public function showAnggota($nama_perusahaan)
     {
         $perusahaan = Perusahaan::where('nama', $nama_perusahaan)->first();
         if (!$perusahaan) {
             return response()->json(['error' => 'Perusahaan not found'], 404);
-        }else{
+        } else {
             $admin = Admin::where('id_perusahaan', $perusahaan->id)->get();
             $pekerja = Pekerja::where('id_perusahaan', $perusahaan->id)->get();
-            $jumlahadmin= count($admin); // Calculate total number of administrators and workers
+            $jumlahadmin = count($admin); // Calculate total number of administrators and workers
             $jumlahPekerja = count($pekerja);
         }
         return response()->json([
@@ -149,51 +155,95 @@ class PerusahaanController extends Controller
     }
 
     // Update a specific perusahaan
-    public function update(Request $request, $id)
+    public function updateData(Request $request, $id)
     {
         try {
-            $perusahaan = Perusahaan::find($id);
+            $perusahaan = DB::table('perusahaan')->where('id', $id)->first();
             if (!$perusahaan) {
                 return response()->json(['error' => 'Perusahaan not found'], 404);
             }
-            $nama = $perusahaan->nama;
+
             $updateData = [];
-    
+
             if ($request->filled('nama')) {
                 $updateData['nama'] = $request->input('nama');
-                $nama = $request->input('nama');
             }
-    
+
             if ($request->filled('latitude')) {
                 $updateData['latitude'] = $request->input('latitude');
             }
-    
+
             if ($request->filled('longitude')) {
                 $updateData['longitude'] = $request->input('longitude');
             }
-    
-            if ($request->filled('batas_aktif')) {
-                $updateData['batas_aktif'] = $request->input('batas_aktif');
+
+            $jamMasuk = $request->input('jammasuk');
+            $jamKeluar = $request->input('jamkeluar');
+
+            if ($jamMasuk) {
+                $validatedTime = $this->validateTimeFormat($jamMasuk);
+                if ($validatedTime) {
+                    $updateData['jam_masuk'] = $validatedTime;
+                } else {
+                    return response()->json(['error' => $jamMasuk], 400);
+                }
             }
-    
+
+            if ($jamKeluar) {
+                $validatedTime = $this->validateTimeFormat($jamKeluar);
+                if ($validatedTime) {
+                    $updateData['jam_keluar'] = $validatedTime;
+                } else {
+                    return response()->json(['error' => $jamKeluar], 400);
+                }
+            }
+            if ($request->filled('holiday')) {
+                $updateData['holiday'] = $request->input('holiday');
+            }
             if ($request->hasFile('logo')) {
+                if (!empty($perusahaan->logo) && Storage::disk('public')->exists($perusahaan->logo)) {
+                    Storage::disk('public')->delete($perusahaan->logo);
+
+                    // Get the directory of the previous profile image
+                    $directory = dirname($perusahaan->logo);
+
+                    // Check if the directory is empty
+                    $files = Storage::disk('public')->files($directory);
+                    if (empty($files)) {
+                        Storage::disk('public')->deleteDirectory($directory);
+                    }
+                }
+
                 $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
                 $fileContent = file_get_contents($request->file('logo')->getRealPath());
                 $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
                 $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
-                $logoPath = "perusahaan/{$nama}/logo/{$fileName}";
-    
+                $logoPath = "perusahaan/{$perusahaan->nama}/logo/{$fileName}";
+                $updateData['logo'] = $logoPath;
                 Storage::disk('public')->put($logoPath, $encryptedContent);
             }
-    
-            $perusahaan->update($updateData);
-    
-            return response()->json(['status' => 'success', 'message' => 'Perusahaan updated successfully']);
+
+            // Update the company data in the database
+            DB::table('perusahaan')->where('id', $id)->update($updateData);
+
+            // Fetch the updated company data
+            $updatedPerusahaan = DB::table('perusahaan')->where('id', $id)->first();
+
+            return response()->json(['status' => 'success', 'perusahaan' => $updatedPerusahaan]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Internal Server Error'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-    
+
+    private function validateTimeFormat($timeString)
+    {
+        try {
+            $carbonTime = Carbon::createFromFormat('H:i:s', $timeString);
+            return $carbonTime->format('H:i:s');
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
     public function getPerusahaanData($namaPerusahaan)
     {
         $perusahaan = Perusahaan::where('nama', $namaPerusahaan)->first();

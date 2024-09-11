@@ -40,6 +40,7 @@ Route::put('/Perusahaan/editPasswordAdmin', [AdminController::class, 'editPasswo
 Route::get('/Perusahaan/getAnggota/{nama_perusahaan}', [PerusahaanController::class, 'showAnggota']);
 Route::put('/Perusahaan/UpdateDataPekerja/{id}', [PekerjaController::class, 'updateData']);
 Route::put('/Perusahaan/UpdateDataAdmin/{id}', [AdminController::class, 'updateData']);
+Route::put('/Perusahaan/UpdateDataPerusahaan/{id}', [PerusahaanController::class, 'updateData']);
 Route::get('/getAllSecretKeys', [PerusahaanController::class, 'index']);
 Route::get('/Dinas/getDataDinasPerusahaan/{nama_perusahaan}', [DinasController::class, 'getDataPerusahaan']);
 Route::get('/Dinas/getDataDinasPekerja/{nama_perusahaan}/{nama_pekerja}', [DinasController::class, 'getDataPekerja']);
@@ -68,3 +69,4 @@ Route::get('/Lembur/decryptBukti/{lemburId}', [LemburController::class, 'getDecr
 Route::get('/Dinas/decryptBukti/{dinasId}', [DinasController::class, 'getDecryptedBukti']);
 Route::get('/Izin/decryptBukti/{izinId}', [IzinController::class, 'getDecryptedBukti']);
 Route::get('/getData', [LoginController::class, 'getData']);
+Route::get('/Lembur/GetSession/{lemburId}', [LemburController::class, 'getDataSession']);
