@@ -47,7 +47,8 @@ class IzinController extends Controller
         $fileContent = file_get_contents($request->file('logo')->getRealPath());
         $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
         $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
-        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Izin/Bukti/{$fileName}";
+        $date = date('Y-m-d');
+        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Izin/{$date}/Bukti/{$fileName}";
 
         Storage::disk('public')->put($buktiPath, $encryptedContent);
         $Izin = Izin::create([
@@ -84,8 +85,9 @@ class IzinController extends Controller
         if ($request->hasFile('bukti')) {
             $buktiPath = public_path("storage/{$izin->bukti}");
             File::delete($buktiPath);    
+            $date = date('Y-m-d');
             $buktiPath = $request->file('bukti')->storeAs(
-                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Izin/Bukti",
+                "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Izin/{$date}/Bukti",
                 time() . '_' . $request->file('bukti')->getClientOriginalName(),
                 'public'
             );

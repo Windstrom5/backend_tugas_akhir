@@ -27,7 +27,8 @@ class DinasController extends Controller
         $fileContent = file_get_contents($request->file('logo')->getRealPath());
         $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
         $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
-        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Dinas/Bukti/{$fileName}";
+        $date = date('Y-m-d');
+        $buktiPath = "perusahaan/{$perusahaan->nama}/Pekerja/{$pekerja->nama}/Dinas/{$date}/Bukti/{$fileName}";
 
         Storage::disk('public')->put($buktiPath, $encryptedContent);
         $Dinas = Dinas::create([
@@ -64,7 +65,8 @@ class DinasController extends Controller
             $fileContent = file_get_contents($request->file('logo')->getRealPath());
             $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
-            $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Dinas/Bukti/{$fileName}";
+            $date = date('Y-m-d');
+            $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Dinas/{$date}/Bukti/{$fileName}";
     
             Storage::disk('public')->put($buktiPath, $encryptedContent);
             $dinas->bukti = $buktiPath;
