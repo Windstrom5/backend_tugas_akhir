@@ -44,7 +44,7 @@ class IzinController extends Controller
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
         $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
-        $fileContent = file_get_contents($request->file('logo')->getRealPath());
+        $fileContent = file_get_contents($request->file('bukti')->getRealPath());
         $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
         $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
         $date = date('Y-m-d');
@@ -77,11 +77,18 @@ class IzinController extends Controller
             // Handle case when Izin is not found
             return response()->json(['error' => 'Izin not found'], 404);
         }
+        $updateData = [];
+        if ($request->input('tanggal')){
+            $updateData ['tanggal'] = $request->input('tanggal');
+        }
+        if ($request->input('kategori')){
+            $updateData ['kategori'] = $request->input('kategori');
+        }
+        if ($request->input('alasan')){
+            $updateData ['alasan'] = $request->input('alasan');
+        }
         $perusahaanNama = $izin->perusahaan_nama;
         $pekerjaNama = $izin->pekerja_nama;
-        $izin->tanggal = $request->input('tanggal');
-        $izin->kategori = $request->input('kategori');
-        $izin->alasan = $request->input('alasan');
         if ($request->hasFile('bukti')) {
             $buktiPath = public_path("storage/{$izin->bukti}");
             File::delete($buktiPath);    
@@ -91,18 +98,13 @@ class IzinController extends Controller
                 time() . '_' . $request->file('bukti')->getClientOriginalName(),
                 'public'
             );
-            $izin->bukti = $buktiPath;
-            DB::table('izin')
-            ->where('id', $id)
-            ->update(['bukti' => $buktiPath]);
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            Storage::disk('public')->put($buktiPath, $encryptedContent);
+            $updateData['bukti'] = $buktiPath;
         }
-        DB::table('izin')
-        ->where('id', $id)
-        ->update([
-            'tanggal' => $request->input('tanggal'),
-            'kategori' => $request->input('kategori'),
-            'alasan' => $request->input('alasan'),
-        ]);
+        DB::table('izin')->where('id', $id)->update($updateData);
         return response()->json(['status' => 'success', 'message' => 'Izin updated successfully']);
     }
     

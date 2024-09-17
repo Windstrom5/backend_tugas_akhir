@@ -24,7 +24,7 @@ class DinasController extends Controller
             return response()->json(['error' => 'Perusahaan not found'], 404);
         }
         $pekerja = DB::table('pekerja')->where('pekerja.nama', $request->input('nama'))->first();
-        $fileContent = file_get_contents($request->file('logo')->getRealPath());
+        $fileContent = file_get_contents($request->file('bukti')->getRealPath());
         $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
         $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
         $date = date('Y-m-d');
@@ -57,31 +57,36 @@ class DinasController extends Controller
             // Handle case when dinas is not found
             return response()->json(['error' => 'dinas not found'], 404);
         }
+        $updateData = [];
+        if ($request->input('berangkat')){
+            $updateData ['berangkat'] = $request->input('berangkat');
+        }
+        if ($request->input('pulang')){
+            $updateData ['pulang'] = $request->input('pulang');
+        }
+        if ($request->input('tujuan')){
+            $updateData ['tujuan'] = $request->input('tujuan');
+        }
+        if ($request->input('kegiatan')){
+            $updateData ['kegiatan'] = $request->input('kegiatan');
+        }
         $perusahaanNama = $dinas->perusahaan_nama;
         $pekerjaNama = $dinas->pekerja_nama;
         if ($request->hasFile('bukti')) {
             $buktiPath = public_path("storage/{$dinas->bukti}");
             File::delete($buktiPath);    
-            $fileContent = file_get_contents($request->file('logo')->getRealPath());
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
             $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
-            $fileName = time() . '_' . $request->file('logo')->getClientOriginalName();
+            $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
             $date = date('Y-m-d');
             $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Dinas/{$date}/Bukti/{$fileName}";
-    
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             Storage::disk('public')->put($buktiPath, $encryptedContent);
-            $dinas->bukti = $buktiPath;
-            DB::table('dinas')
-            ->where('id', $id)
-            ->update(['bukti' => $buktiPath]);
-        }
-        DB::table('dinas')
-        ->where('id', $id)
-        ->update([
-            'tanggal_berangkat' => $request->input('berangkat'),
-            'tanggal_pulang' => $request->input('pulang'),
-            'tujuan' => $request->input('tujuan'),
-            'kegiatan' => $request->input('kegiatan'),
-        ]);
+            $updateData['bukti'] = $buktiPath;
+        }   
+        DB::table('dinas')->where('id', $id)->update($updateData);
         return response()->json(['status' => 'success', 'message' => 'dinas updated successfully']);
     }
     

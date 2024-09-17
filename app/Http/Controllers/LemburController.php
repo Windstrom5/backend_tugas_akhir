@@ -100,24 +100,31 @@ class LemburController extends Controller
             // Handle case when lembur is not found
             return response()->json(['error' => 'lembur not found'], 404);
         }
+        $updateData = [];
+        if ($request->input('keterangan')){
+            $updateData ['keterangan'] = $request->input('keterangan');
+        }
+        if($request->input($request->input('jam'))){
+            $updateData ['jam'] = $request->input('jam');
+        }
         $perusahaanNama = $sessionlembur->perusahaan_nama;
         $pekerjaNama = $sessionlembur->pekerja_nama;
         $date = date('Y-m-d');
         if ($request->hasFile('bukti')) {
-            $fileContent = file_get_contents($request->file('logo')->getRealPath());
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
             $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
             $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Lembur/{$date}/Bukti/Sesi/{$request->input('sesi')}/{$fileName}";
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             Storage::disk('public')->put($buktiPath, $encryptedContent);
-            $sessionlembur->bukti = $buktiPath;
+            $updateData['bukti'] = $buktiPath;
         }
         DB::table('session_lembur')
             ->where('id', $id)
             ->update([
-                'id_lembur' => $lembur->id,
-                'jam' => $request->input('jam'),
-                'keterangan' => $request->input('keterangan'),
-                'bukti' => $request->input('bukti'),
+
             ]);
         return response()->json(['status' => 'success', 'message' => 'session updated successfully']);
     }
@@ -216,35 +223,40 @@ class LemburController extends Controller
             ->select('lembur.*', 'perusahaan.nama as perusahaan_nama', 'pekerja.nama as pekerja_nama')
             ->where('lembur.id', $id)
             ->first();
-        // Check if the lembur record exists
+        $lemburId = $id;
         if (!$lembur) {
             // Handle case when lembur is not found
             return response()->json(['error' => 'lembur not found'], 404);
         }
+        $updateData = [];
+        if ($request->input('tanggal')){
+            $updateData ['tanggal'] = $request->input('tanggal');
+        }
+        if($request->input('masuk')){
+            $updateData ['waktu_masuk'] = $request->input('masuk');
+        }
+        if($request->input('pulang')){
+            $updateData ['waktu_pulang'] = $request->input('pulang');
+        }
+        if($request->input('pekerjaan')){
+            $updateData ['pekerjaan'] = $request->input('pekerjaan');
+        }
         $perusahaanNama = $lembur->perusahaan_nama;
         $pekerjaNama = $lembur->pekerja_nama;
         if ($request->hasFile('bukti')) {
-            $fileContent = file_get_contents($request->file('logo')->getRealPath());
-            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
             $date = date('Y-m-d');
             $buktiPath = public_path("storage/{$lembur->bukti}");
             File::delete($buktiPath);    
             $buktiPath = "perusahaan/{$perusahaanNama}/Pekerja/{$pekerjaNama}/Lembur/Request/{$date}/{$fileName}";
+            $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
+            $fileContent = file_get_contents($request->file('bukti')->getRealPath());
+            $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             Storage::disk('public')->put($buktiPath, $encryptedContent);
-            $lembur->bukti = $buktiPath;
-            DB::table('lembur')
-                ->where('id', $id)
-                ->update(['bukti' => $buktiPath]);
+            $updateData['bukti'] = $buktiPath;
         }
-        DB::table('lembur')
-            ->where('id', $id)
-            ->update([
-                'tanggal' => $request->input('tanggal'),
-                'waktu_masuk' => $request->input('masuk'),
-                'waktu_pulang' => $request->input('pulang'),
-                'pekerjaan' => $request->input('pekerjaan'),
-            ]);
+        DB::table('lembur')->where('id', $lemburId)->update($updateData);
+
         return response()->json(['status' => 'success', 'message' => 'lembur updated successfully']);
     }
 
