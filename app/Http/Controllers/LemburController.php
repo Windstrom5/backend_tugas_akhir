@@ -30,13 +30,14 @@ class LemburController extends Controller
         $lemburData = DB::table('lembur')
             ->join('pekerja', 'lembur.id_pekerja', '=', 'pekerja.id')
             ->join('perusahaan', 'lembur.id_perusahaan', '=', 'perusahaan.id')
-            ->select('lembur.*,perusahaan.nama as nama_perusahaan,pekerja.nama as nama_pekerja')
+            ->select('lembur.*', 'perusahaan.nama as nama_perusahaan', 'pekerja.nama as nama_pekerja') // Corrected line
             ->where('pekerja.nama', $nama_pekerja)
             ->where('perusahaan.nama', $nama_perusahaan)
             ->get();
-
+    
         return response()->json(['data' => $lemburData]);
     }
+    
 
     public function getDataSession($LemburId)
     {
@@ -82,7 +83,7 @@ class LemburController extends Controller
     }
 
     public function updateSession(Request $request, $id)
-    {
+    {   
         $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         $lembur = DB::table('lembur')->where('lembur.id', $request->input('id_lembur'))->first();
         $sessionlembur = DB::table('session_lembur')
@@ -111,6 +112,7 @@ class LemburController extends Controller
         $pekerjaNama = $sessionlembur->pekerja_nama;
         $date = date('Y-m-d');
         if ($request->hasFile('bukti')) {
+            $buktiPath = public_path("storage/{$sessionlembur->bukti}");
             $fileContent = file_get_contents($request->file('bukti')->getRealPath());
             $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $fileName = time() . '_' . $request->file('bukti')->getClientOriginalName();
@@ -119,6 +121,7 @@ class LemburController extends Controller
             $fileContent = file_get_contents($request->file('bukti')->getRealPath());
             $encryptedContent = openssl_encrypt($fileContent, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             Storage::disk('public')->put($buktiPath, $encryptedContent);
+            File::delete($buktiPath);    
             $updateData['bukti'] = $buktiPath;
         }
         DB::table('session_lembur')
