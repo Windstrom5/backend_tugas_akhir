@@ -57,6 +57,24 @@ class LemburController extends Controller
 
         return response()->json(['data' => $lemburData]);
     }
+    public function getDataSessionperusahaan($perusahaanId)
+    {
+        $lemburData = DB::table('session_lembur')
+            ->join('lembur', 'session_lembur.id_lembur', '=', 'lembur.id')
+            ->join('pekerja', 'lembur.id_pekerja', '=', 'pekerja.id')
+            ->join('perusahaan', 'lembur.id_perusahaan', '=', 'perusahaan.id')
+            ->select(
+                'session_lembur.*',
+                'lembur.id as id_lembur',
+                'perusahaan.nama as nama_perusahaan',
+                'pekerja.nama as nama_pekerja'
+            )
+            ->where('perusahaan.id', $perusahaanId)
+            ->get();
+
+
+        return response()->json(['data' => $lemburData]);
+    }
     public function addSession(Request $request)
     {
         $lembur = DB::table('lembur')->where('lembur.id', $request->input('id_lembur'))->first();
@@ -134,11 +152,11 @@ class LemburController extends Controller
 
     public function updatestatusSession(Request $request)
     {
-        $sessionlembur = Lembur::select('session_lembur.*', 'perusahaan.nama as nama_perusahaan')
-            ->join('lembur', 'session_lembur.id_lembur', '=', 'lembur.id')
-            ->join('perusahaan', 'lembur.id_perusahaan', '=', 'perusahaan.id')
+        $sessionlembur = session_lembur::select('session_lembur.*', 'perusahaan.nama as nama_perusahaan')
+            ->join('lembur as lemburTable', 'session_lembur.id_lembur', '=', 'lemburTable.id')
+            ->join('perusahaan', 'lemburTable.id_perusahaan', '=', 'perusahaan.id')
             ->where('session_lembur.id', $request->input('id'))
-            ->first();
+            ->first();    
         if ($sessionlembur) {
             // Update the status field
             $sessionlembur->update([

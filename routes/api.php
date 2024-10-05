@@ -70,7 +70,8 @@ Route::get('/Dinas/decryptBukti/{dinasId}', [DinasController::class, 'getDecrypt
 Route::get('/Izin/decryptBukti/{izinId}', [IzinController::class, 'getDecryptedBukti']);
 Route::get('/getData', [LoginController::class, 'getData']);
 Route::get('/Lembur/Session/GetSession/{lemburId}', [LemburController::class, 'getDataSession']);
-Route::get('/Lembur/Session/AddSession', [LemburController::class, 'addSession']);
-Route::get('/Lembur/Session/UpdateSession/{id}', [LemburController::class, 'updateSession']);
-Route::get('/Lembur/Session/UpdateStatus', [LemburController::class, 'updatestatusSession']);
+Route::get('/Lembur/Session/getDataSessionperusahaan/{perusahaanId}', [LemburController::class, 'getDataSessionperusahaan']);
+Route::post('/Lembur/Session/AddSession', [LemburController::class, 'addSession']);
+Route::put('/Lembur/Session/UpdateSession/{id}', [LemburController::class, 'updateSession']);
+Route::put('/Lembur/Session/UpdateStatus', [LemburController::class, 'updatestatusSession']);
 Route::get('/Lembur/Session/decryptBukti/{sessionId}', [LemburController::class, 'getDecryptedSessionBukti']);

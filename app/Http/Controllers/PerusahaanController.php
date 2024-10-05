@@ -44,8 +44,8 @@ class PerusahaanController extends Controller
                 Storage::disk('public')->put($logoPath, $encryptedContent);
             }
             $secretKey = $request->input('secret_key');
-            // $encryptedSecretKey = openssl_encrypt($secretKey, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
-            $encryptedSecretKey = Hash::make($request->input('password'));
+            $encryptedSecretKey = openssl_encrypt($secretKey, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            // $encryptedSecretKey = Hash::make($request->input('secret_key'));
             $perusahaan = Perusahaan::create([
                 'nama' => $nama,
                 'latitude' => $request->input('latitude'),

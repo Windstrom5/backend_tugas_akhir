@@ -131,7 +131,7 @@ class AbsenController extends Controller
             ->get();
     
         if ($absendata) {
-            return response()->json($absendata);
+            return response()->json([$absendata]);
         } else {
             return response()->json(['status' => 'error', 'message' => 'offline'], 404);
         }

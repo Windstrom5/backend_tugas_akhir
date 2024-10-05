@@ -13,46 +13,65 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $email = $request->input('email');
-        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');  
+        $encryptionKey = env('OPENSSL_ENCRYPTION_KEY');
         $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+        
+        // Check in the admin table
         $admin = DB::table('admin')
-        ->select('admin.*')
-        ->where('admin.email', $email)
-        ->where('admin.password', $encryptedPassword)
-        ->first();
-        if (!$admin) {
-            $pekerja = DB::table('pekerja')
-            ->select('pekerja.*')
-            ->where('pekerja.email', $email)
-            ->where('pekerja.password', $encryptedPassword)
+            ->select('admin.*')
+            ->where('admin.email', $email)
             ->first();
-            if (!$pekerja){
-                return response()->json(['error' => 'not found'], 500);
-            }else{
-                // $token = $this->generateUniqueToken($pekerja->id,'Pekerja');
-                // $loginSession = new SessionLoginPekerja;
-                // $loginSession ->id_pekerja = $pekerja->id;
-                // $loginSession ->token = $token;
-                // $loginSession ->save();
-                $perusahaan = DB::table('perusahaan')
-                ->select('perusahaan.*')
-                ->where('perusahaan.id', $pekerja->id_perusahaan)
+    
+        if (!$admin) {
+            // Check in the pekerja table
+            $pekerja = DB::table('pekerja')
+                ->select('pekerja.*')
+                ->where('pekerja.email', $email)
                 ->first();
-                return response()->json(['perusahaan' => $perusahaan, 'user' => $pekerja,'Role' => 'Pekerja']);
+    
+            if (!$pekerja) {
+                return response()->json(['error' => 'not found'], 500);
+            } else {
+                // Decrypt the stored password for pekerja
+                $decryptedPassword = openssl_decrypt($pekerja->password, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+    
+                // Verify the decrypted password against the input password
+                if ($decryptedPassword !== $request->input('password')) {
+                    return response()->json(['error' => 'Invalid password: ' . $decryptedPassword], 401);
+                }
+    
+                $perusahaan = DB::table('perusahaan')
+                    ->select('perusahaan.*')
+                    ->where('perusahaan.id', $pekerja->id_perusahaan)
+                    ->first();
+                if ($perusahaan) {
+                    // Decrypt the secret_key
+                    $perusahaan->secret_key = openssl_decrypt($perusahaan->secret_key, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+                }    
+                return response()->json(['perusahaan' => $perusahaan, 'user' => $pekerja, 'Role' => 'Pekerja']);
             }
-        }else{
-            // $token = $this->generateUniqueToken($admin->id,'Admin');
-            // $loginSession = new SessionLoginAdmin;
-            // $loginSession ->id_admin = $admin->id;
-            // $loginSession ->token = $token;
-            // $loginSession ->save();
+        } else {
+            // Decrypt the stored password for admin
+            $decryptedPassword = openssl_decrypt($admin->password, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+    
+            // Verify the decrypted password against the input password
+            if ($decryptedPassword !== $request->input('password')) {
+                return response()->json(['error' => 'Invalid password: ' . $decryptedPassword], 401);
+            }
+    
             $perusahaan = DB::table('perusahaan')
                 ->select('perusahaan.*')
                 ->where('perusahaan.id', $admin->id_perusahaan)
                 ->first();
-            return response()->json(['perusahaan' => $perusahaan,'user' => $admin,'Role' => 'Admin']);
+    
+            if ($perusahaan) {
+                // Decrypt the secret_key
+                $perusahaan->secret_key = openssl_decrypt($perusahaan->secret_key, 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            }       
+            return response()->json(['perusahaan' => $perusahaan, 'user' => $admin, 'Role' => 'Admin']);
         }
     }
+    
     public function getData(Request $request)
     {
         $id = $request->input('id');

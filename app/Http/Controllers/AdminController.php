@@ -32,12 +32,12 @@ class AdminController extends Controller
 
                 Storage::disk('public')->put($profilePath, $encryptedContent);
             }
-            // $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
+            $encryptedPassword = openssl_encrypt($request->input('password'), 'aes-256-cbc', $encryptionKey, 0, substr($encryptionKey, 0, 16));
             $hashedPassword = Hash::make($request->input('password'));
             $admin = Admin::create([
                 'id_perusahaan' => $perusahaan->id,
                 'email' => $request->input('email'),
-                'password' => $hashedPassword,
+                'password' => $encryptedPassword,
                 'nama' => $nama,
                 'tanggal_lahir' => $request->input('tanggal_lahir'),
                 'profile' => $profilePath,
